@@ -221,11 +221,12 @@ const LIVE_LINE_TIME_PADDING = 150
 
 export const SegmentTimelineLine = translate()(withTiming<IProps, IState>((props: IProps) => {
 	return {
-		isHighResolution: false,
+		isHighResolution: true,
 		filter: ['segmentLineDurations', props.segmentLine._id]
 	}
 })(class extends React.Component<Translated<WithTiming<IProps>>, IState> {
 	private _configValueMemo: { [key: string]: ConfigItemValue } = {}
+	private _oldWidth: number = 0
 
 	constructor (props: Translated<WithTiming<IProps>>) {
 		super(props)
@@ -257,7 +258,7 @@ export const SegmentTimelineLine = translate()(withTiming<IProps, IState>((props
 			if (this.props.segmentLine.duration) {
 				return this.props.segmentLine.duration
 			} else {
-				return getCurrentTime() - (this.props.segmentLine.getLastStartedPlayback() || 0)
+				return this.props.currentTime - (this.props.segmentLine.getLastStartedPlayback() || 0)
 			}
 		} else {
 			return 0
@@ -308,8 +309,13 @@ export const SegmentTimelineLine = translate()(withTiming<IProps, IState>((props
 				willChange: this.state.isLive ? 'width' : undefined
 			}
 		} else {
+			const width = Math.floor(this.getLineDuration() * this.props.timeScale)
+			const diff = (this._oldWidth - width)
+			if (diff !== 0) console.log(this.props.currentTime + ' - %c' + diff, 'color: blue')
+			this._oldWidth = width
+
 			return {
-				minWidth: Math.floor(this.getLineDuration() * this.props.timeScale).toString() + 'px',
+				minWidth: width.toString() + 'px',
 				// minWidth: (Math.max(this.state.liveDuration, this.props.segmentLine.duration || this.props.segmentLine.expectedDuration || 3000) * this.props.timeScale).toString() + 'px',
 				willChange: this.state.isLive ? 'minWidth' : undefined
 			}

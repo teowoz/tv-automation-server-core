@@ -37,10 +37,12 @@ export namespace RunningOrderTiming {
 		segmentLineExpectedDurations?: {
 			[key: string]: number
 		}
+		currentTime?: number
 	}
 
 	export interface InjectedROTimingProps {
 		timingDurations: RunningOrderTimingContext
+		currentTime: number
 	}
 }
 
@@ -60,6 +62,10 @@ interface IRunningOrderTimingProviderState {
 }
 interface IRunningOrderTimingProviderTrackedProps {
 	segmentLines: Array<SegmentLine>
+}
+
+export interface TimeEventArgs {
+	currentTime: number
 }
 
 export const RunningOrderTimingProvider = withTracker<IRunningOrderTimingProviderProps, IRunningOrderTimingProviderState, IRunningOrderTimingProviderTrackedProps>(
@@ -106,13 +112,14 @@ export const RunningOrderTimingProvider = withTracker<IRunningOrderTimingProvide
 	}
 
 	onRefreshTimer = () => {
-		this.updateDurations()
+		const now = getCurrentTime()
 
-		this.dispatchHREvent()
+		this.updateDurations(now)
+		this.dispatchHREvent(now)
 
 		this.refreshDecimator++
 		if (this.refreshDecimator % LOW_RESOLUTION_TIMING_DECIMATOR === 0) {
-			this.dispatchEvent()
+			this.dispatchEvent(now)
 		}
 	}
 
@@ -134,17 +141,33 @@ export const RunningOrderTimingProvider = withTracker<IRunningOrderTimingProvide
 		Meteor.clearInterval(this.refreshTimer)
 	}
 
-	dispatchHREvent () {
-		const event = new Event(RunningOrderTiming.Events.timeupdateHR)
+	dispatchHREvent (currentTime: number) {
+		const event = new CustomEvent<TimeEventArgs>(RunningOrderTiming.Events.timeupdateHR, {
+			detail: {
+				currentTime: currentTime
+			}
+		})
+		setTimeout(function () {
+			console.log('%cThis is next tick', 'color: gold')
+		})
+		setTimeout(function () {
+			console.log('%cThis is 50ms away', 'color: gold')
+		}, 50)
+		console.log('HR Event')
+		window.dispatchEvent(event)
+		console.log('HR Event End')
+	}
+
+	dispatchEvent (currentTime: number) {
+		const event = new CustomEvent(RunningOrderTiming.Events.timeupdate, {
+			detail: {
+				currentTime: currentTime
+			}
+		})
 		window.dispatchEvent(event)
 	}
 
-	dispatchEvent () {
-		const event = new Event(RunningOrderTiming.Events.timeupdate)
-		window.dispatchEvent(event)
-	}
-
-	updateDurations () {
+	updateDurations (currentTime: number) {
 		let totalRundownDuration = 0
 		let remainingRundownDuration = 0
 		let asPlayedRundownDuration = 0
@@ -173,7 +196,7 @@ export const RunningOrderTimingProvider = withTracker<IRunningOrderTimingProvide
 
 		let nextAIndex = -1
 
-		let now = getCurrentTime()
+		let now = currentTime
 
 		if (runningOrder && segmentLines) {
 			segmentLines.forEach((item, itIndex) => {
@@ -249,7 +272,8 @@ export const RunningOrderTimingProvider = withTracker<IRunningOrderTimingProvide
 			segmentLinePlayed: segLinePlayed,
 			segmentLineStartsAt: segLineStartsAt,
 			segmentLineDisplayStartsAt: segLineDisplayStartsAt,
-			segmentLineExpectedDurations: segLineExpectedDurations
+			segmentLineExpectedDurations: segLineExpectedDurations,
+			currentTime: currentTime
 		})
 	}
 
@@ -278,8 +302,9 @@ export function withTiming<IProps, IState> (options?: WithTimingOptions | Functi
 				durations: PropTypes.object.isRequired
 			}
 
-			filterGetter: (o: any) => any
-			previousValue: any = null
+			private filterGetter: (o: any) => any
+			private previousValue: any = null
+			private lastCurrentTime: number = getCurrentTime()
 
 			constructor (props, context) {
 				super(props, context)
@@ -309,7 +334,9 @@ export function withTiming<IProps, IState> (options?: WithTimingOptions | Functi
 					, this.refreshComponent)
 			}
 
-			refreshComponent = () => {
+			refreshComponent = (e: CustomEvent<TimeEventArgs>) => {
+				this.lastCurrentTime = e.detail.currentTime
+
 				if (!this.filterGetter) {
 					this.forceUpdate()
 				} else {
@@ -326,7 +353,8 @@ export function withTiming<IProps, IState> (options?: WithTimingOptions | Functi
 					= this.context.durations
 
 				const allProps: WithTiming<IProps> = _.extend({
-					timingDurations: durations
+					timingDurations: durations,
+					currentTime: this.lastCurrentTime
 				}, this.props)
 				return <WrappedComponent { ...allProps } />
 			}

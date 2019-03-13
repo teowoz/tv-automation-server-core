@@ -292,7 +292,7 @@ export class ConfigManifestSettings extends React.Component<Translated<IConfigMa
 		return (
 			<div>
 				<ModalDialog title={t('Add config item')} acceptText={t('Add')} secondaryText={t('Cancel')} show={this.state.showAddItem} onAccept={(e) => this.handleConfirmAddItemAccept(e)} onSecondary={(e) => this.handleConfirmAddItemCancel(e)}>
-					<div className='mod mvs mhs'>
+					<div className='mod mvs'>
 						<label className='field'>
 							{t('Item')}
 							<div className='select focusable'>

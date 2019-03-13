@@ -38,6 +38,7 @@ import * as Zoom_Out_MouseOut from './Zoom_Out_MouseOut.json'
 // @ts-ignore Not recognized by Typescript
 import * as Zoom_Out_MouseOver from './Zoom_Out_MouseOver.json'
 import { LottieButton } from '../../lib/LottieButton'
+import { getCurrentTime } from '../../../lib/lib';
 
 interface IProps {
 	key: string
@@ -242,6 +243,10 @@ class SegmentTimelineZoomButtons extends React.Component<IProps> {
 
 export const SegmentTimelineElementId = 'running-order__segment__'
 export class SegmentTimelineClass extends React.Component<Translated<IProps>, IStateHeader> {
+	static contextTypes = {
+		durations: PropTypes.object.isRequired
+	}
+
 	timeline: HTMLDivElement
 	segmentBlock: HTMLDivElement
 
@@ -251,6 +256,7 @@ export class SegmentTimelineClass extends React.Component<Translated<IProps>, IS
 		clientX: number
 		clientY: number
 	} | undefined = undefined
+	private _oldScroll: number = 0
 
 	constructor (props: Translated<IProps>) {
 		super(props)
@@ -384,8 +390,13 @@ export class SegmentTimelineClass extends React.Component<Translated<IProps>, IS
 	}
 
 	timelineStyle () {
+		const scroll = Math.floor(this.props.scrollLeft * this.props.timeScale)
+		const diff = this._oldScroll - scroll
+		if (diff !== 0) console.log(this.context.durations.currentTime + ' - %c' + diff, 'color: red')
+		this._oldScroll = scroll
+
 		return {
-			'transform': 'translate3d(-' + Math.floor(this.props.scrollLeft * this.props.timeScale).toString() + 'px, 0, 0.1px)',
+			'transform': 'translate3d(-' + scroll.toString() + 'px, 0, 0.1px)',
 			'willChange': 'transform'
 		}
 	}
