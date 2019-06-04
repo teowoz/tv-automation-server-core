@@ -7,6 +7,7 @@ import { FindOptions, MongoSelector, TransformedCollection } from '../typings/me
 import { Meteor } from 'meteor/meteor'
 import { IBlueprintSegmentDB } from 'tv-automation-sofie-blueprints-integration'
 import { PartNote } from '../api/notes'
+import { PartInstance, PartInstances } from './PartInstances'
 
 /** A "Title" in NRK Lingo / "Stories" in ENPS Lingo. */
 export interface DBSegment extends IBlueprintSegmentDB {
@@ -54,6 +55,22 @@ export class Segment implements DBSegment {
 				sort: { _rank: 1 }
 			}, options)
 		).fetch()
+	}
+	getPartsOrInstances (): Array<PartInstance> {
+		const instances = PartInstances.find({
+			rundownId: this.rundownId,
+			segmentId: this._id,
+			isReset: { $not: { $eq: true } }
+		}).fetch()
+		const instanceIds = _.map(instances, i => i.partId)
+
+		const parts = Parts.find({
+			rundownId: this.rundownId,
+			segmentId: this._id,
+			_id: { $not: { $in: instanceIds } }
+		}).map(part => PartInstance.FromPart(part))
+
+		return _.sortBy(parts.concat(instances), part => part._rank)
 	}
 	getNotes (includeParts?: boolean, runtimeNotes?: boolean) {
 		let notes: Array<PartNote> = []

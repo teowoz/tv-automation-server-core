@@ -13,6 +13,7 @@ import { Part, Parts } from './collections/Parts'
 import { Rundown } from './collections/Rundowns'
 import { ShowStyleBase } from './collections/ShowStyleBases'
 import { interpretExpression } from 'superfly-timeline/dist/resolver/expression'
+import { PartInstance } from './collections/PartInstances';
 
 export const DEFAULT_DISPLAY_DURATION = 3000
 
@@ -27,7 +28,7 @@ export interface SegmentExtended extends Segment {
 	}
 }
 
-export interface PartExtended extends Part {
+export interface PartExtended extends PartInstance {
 	/** Pieces belonging to this part */
 	pieces: Array<PieceExtended>
 	renderedDuration: number

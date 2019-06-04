@@ -162,7 +162,7 @@ const SegmentTimelineZoom = class extends React.Component<IProps & IZoomPropsHea
 					followLiveLine={this.props.followLiveLine}
 					autoNextPart={this.props.autoNextPart}
 					liveLineHistorySize={this.props.liveLineHistorySize}
-					livePosition={this.props.segment._id === this.props.rundown.currentPartId && part.startedPlayback && part.getLastStartedPlayback() ? this.props.livePosition - (part.getLastStartedPlayback() || 0) : null}
+					livePosition={this.props.segment._id === this.props.rundown.currentPartId && part.startedPlayback && part.startedPlayback ? this.props.livePosition - part.startedPlayback : null}
 					isLastInSegment={false}
 					isLastSegment={false} />
 			)

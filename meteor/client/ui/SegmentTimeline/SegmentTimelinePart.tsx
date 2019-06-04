@@ -306,11 +306,11 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 	}
 
 	static getCurrentLiveLinePosition (part: PartUi) {
-		if (part.startedPlayback && part.getLastStartedPlayback()) {
+		if (part.startedPlayback) {
 			if (part.duration) {
 				return part.duration
 			} else {
-				return getCurrentTime() - (part.getLastStartedPlayback() || 0) + (part.getLastPlayOffset() || 0)
+				return getCurrentTime() - part.startedPlayback + (part.playOffset || 0)
 			}
 		} else {
 			return 0

@@ -12,8 +12,6 @@ import { Meteor } from 'meteor/meteor'
 import {
 	IBlueprintPartDB,
 	PartHoldMode,
-	BlueprintRuntimeArguments,
-	IBlueprintPartDBTimings,
 } from 'tv-automation-sofie-blueprints-integration'
 import { PartNote, NoteType } from '../api/notes'
 
@@ -27,42 +25,9 @@ export interface DBPart extends IBlueprintPartDB {
 
 	status?: string
 
-	/** Whether the part has started playback (the most recent time it was played).
-	 * This is reset each time setAsNext is used.
-	 * This is set from a callback from the playout gateway
-	 */
-	startedPlayback?: boolean
-	/** Whether the part has stopped playback (the most recent time it was played & stopped).
-	 * This is set from a callback from the playout gateway
-	 */
-	stoppedPlayback?: boolean
-
-	/** The time the system played back this part, null if not yet finished playing, in milliseconds.
-	 * This is set when Take:ing the next part
-	 */
-	duration?: number
-
 	/** Holds notes (warnings / errors) thrown by the blueprints during creation */
 	notes?: Array<PartNote>
-	/** if the part is inserted after another (for adlibbing) */
-	afterPart?: string
-	/** if the part was dunamically inserted (adlib) */
-	dynamicallyInserted?: boolean
 
-	/** Runtime blueprint arguments allows Sofie-side data to be injected into the blueprint for an part */
-	runtimeArguments?: BlueprintRuntimeArguments
-	/** An part should be marked as `dirty` if the part blueprint has been injected with runtimeArguments */
-	dirty?: boolean
-}
-export interface PartTimings extends IBlueprintPartDBTimings {
-	// TODO: remove these, as they are duplicates with IBlueprintPartDBTimings
-
-	/** Point in time the Part stopped playing (ie the time of the playout) */
-	stoppedPlayback: Array<Time>,
-	/** Point in time the Part was set as Next (ie the time of the user action) */
-	next: Array<Time>,
-	/** The playback offset that was set for the last take */
-	playOffset: Array<Time>
 }
 
 export class Part implements DBPart {
@@ -84,18 +49,11 @@ export class Part implements DBPart {
 	public expectedDuration?: number
 	public displayDuration?: number
 	public displayDurationGroup?: string
-	public startedPlayback?: boolean
-	public stoppedPlayback?: boolean
-	public duration?: number
 	public disableOutTransition?: boolean
 	public updateStoryStatus?: boolean
-	public timings?: PartTimings
 	public holdMode?: PartHoldMode
 	public notes?: Array<PartNote>
-	public afterPart?: string
-	public dirty?: boolean
 
-	public runtimeArguments?: BlueprintRuntimeArguments
 	public typeVariant: string
 
 	public classes?: Array<string>
@@ -142,33 +100,6 @@ export class Part implements DBPart {
 			}, options)
 		).fetch()
 	}
-	getTimings () {
-		// return a chronological list of timing events
-		let events: Array<{time: Time, type: string, elapsed: Time}> = []
-		_.each(['take', 'takeDone', 'startedPlayback', 'takeOut', 'stoppedPlayback', 'next'], (key) => {
-			if (this.timings) {
-				_.each(this.timings[key], (t: Time) => {
-					events.push({
-						time: t,
-						type: key,
-						elapsed: 0
-					})
-				})
-			}
-		})
-		let prevEv: any = null
-		return _.map(
-			_.sortBy(events, e => e.time),
-			(ev) => {
-				if (prevEv) {
-					ev.elapsed = ev.time - prevEv.time
-				}
-				prevEv = ev
-				return ev
-			}
-		)
-
-	}
 	getNotes (runtimeNotes?: boolean): Array<PartNote> {
 		let notes: Array<PartNote> = []
 		notes = notes.concat(this.notes || [])
@@ -203,19 +134,32 @@ export class Part implements DBPart {
 		}
 		return notes
 	}
-	getLastStartedPlayback () {
-		if (!this.timings) return undefined
+	getTimings () {
+		// // return a chronological list of timing events
+		// let events: Array<{time: Time, type: string, elapsed: Time}> = []
+		// _.each(['take', 'takeDone', 'startedPlayback', 'takeOut', 'stoppedPlayback', 'next'], (key) => {
+		// 	if (this.timings) {
+		// 		_.each(this.timings[key], (t: Time) => {
+		// 			events.push({
+		// 				time: t,
+		// 				type: key,
+		// 				elapsed: 0
+		// 			})
+		// 		})
+		// 	}
+		// })
+		// let prevEv: any = null
+		// return _.map(
+		// 	_.sortBy(events, e => e.time),
+		// 	(ev) => {
+		// 		if (prevEv) {
+		// 			ev.elapsed = ev.time - prevEv.time
+		// 		}
+		// 		prevEv = ev
+		// 		return ev
+		// 	}
+		// )
 
-		if (!this.timings.startedPlayback || this.timings.startedPlayback.length === 0) return undefined
-
-		return this.timings.startedPlayback[this.timings.startedPlayback.length - 1]
-	}
-	getLastPlayOffset () {
-		if (!this.timings) return undefined
-
-		if (!this.timings.playOffset || this.timings.playOffset.length === 0) return undefined
-
-		return this.timings.playOffset[this.timings.playOffset.length - 1]
 	}
 }
 

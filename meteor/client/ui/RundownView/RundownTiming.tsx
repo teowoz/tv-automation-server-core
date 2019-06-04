@@ -5,9 +5,10 @@ import * as _ from 'underscore'
 import { withTracker } from '../../lib/ReactMeteorData/react-meteor-data'
 import { Rundown } from '../../../lib/collections/Rundowns'
 import { Part, Parts } from '../../../lib/collections/Parts'
-import { getCurrentTime } from '../../../lib/lib'
+import { getCurrentTime, literal } from '../../../lib/lib'
 import { RundownUtils } from '../../lib/rundown'
 import { MeteorReactComponent } from '../../lib/MeteorReactComponent'
+import { PartInstance, DBPartInstance } from '../../../lib/collections/PartInstances';
 
 export namespace RundownTiming {
 	/**
@@ -108,7 +109,7 @@ interface IRundownTimingProviderChildContext {
 interface IRundownTimingProviderState {
 }
 interface IRundownTimingProviderTrackedProps {
-	parts: Array<Part>
+	parts: Array<PartInstance>
 }
 
 /**
@@ -120,15 +121,18 @@ interface IRundownTimingProviderTrackedProps {
 export const RundownTimingProvider =
 withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTimingProviderTrackedProps>(
 (props) => {
+	// TODO - load instances when possible
 	let parts: Array<Part> = []
 	if (props.rundown) {
-		parts = Parts.find({
+		parts = _.map(Parts.find({
 			'rundownId': props.rundown._id,
 		}, {
 			sort: {
 				'_rank': 1
 			}
-		}).fetch()
+		}).fetch(), part => {
+			return new PartInstance(literal<DBPartInstance>(part))
+		})
 	}
 	return {
 		parts
@@ -257,8 +261,8 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 				// expected is just a sum of expectedDurations
 				totalRundownDuration += part.expectedDuration || 0
 
-				const lastStartedPlayback = part.getLastStartedPlayback()
-				const playOffset = part.timings && part.timings.playOffset && _.last(part.timings.playOffset) || 0
+				const lastStartedPlayback = part.startedPlayback
+				const playOffset = part.playOffset || 0
 
 				// asPlayed is the actual duration so far and expected durations in unplayed lines
 				// item is onAir right now, and it's already taking longer than rendered/expectedDuration

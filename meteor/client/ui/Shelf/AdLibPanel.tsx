@@ -27,9 +27,10 @@ import { UserActionAPI } from '../../../lib/api/userActions'
 import { NotificationCenter, Notification, NoticeLevel } from '../../lib/notifications/notifications'
 import { RundownLayoutFilter } from '../../../lib/collections/RundownLayouts'
 import { RundownBaselineAdLibPieces } from '../../../lib/collections/RundownBaselineAdLibPieces'
-import { Random } from 'meteor/random';
-import { literal } from '../../../lib/lib';
-import { RundownAPI } from '../../../lib/api/rundown';
+import { Random } from 'meteor/random'
+import { literal } from '../../../lib/lib'
+import { RundownAPI } from '../../../lib/api/rundown'
+import { PartInstance } from '../../../lib/collections/PartInstances'
 
 interface IListViewPropsHeader {
 	uiSegments: Array<SegmentUi>
@@ -335,7 +336,7 @@ export interface AdLibPieceUi extends AdLibPiece {
 
 export interface SegmentUi extends Segment {
 	/** Pieces belonging to this part */
-	parts: Array<Part>
+	parts: Array<PartInstance>
 	pieces?: Array<AdLibPieceUi>
 	isLive: boolean
 	isNext: boolean
@@ -385,7 +386,7 @@ export const AdLibPanel = translateWithTracker<IProps, IState, ITrackedProps>((p
 
 	const uiSegments = props.rundown ? (segments as Array<SegmentUi>).map((segSource) => {
 		const seg = _.clone(segSource)
-		seg.parts = segSource.getParts()
+		seg.parts = segSource.getPartsOrInstances()
 		let segmentAdLibPieces: Array<AdLibPiece> = []
 		seg.parts.forEach((part) => {
 			if (part._id === props.rundown.currentPartId) {
