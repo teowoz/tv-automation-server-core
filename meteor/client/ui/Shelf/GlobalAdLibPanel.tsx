@@ -460,7 +460,7 @@ export const GlobalAdLibPanel = translateWithTracker<IProps, IState, ITrackedPro
 
 		if (this.props.rundown && this.props.rundown.currentPartId) {
 			const { t } = this.props
-			doUserAction(t, e, UserActionAPI.methods.sourceLayerOnPartStop, [this.props.rundown._id, this.props.rundown.currentPartId, sourceLayer._id])
+			doUserAction(t, e, UserActionAPI.methods.sourceLayerStopActivePiece, [this.props.rundown._id, sourceLayer._id])
 		}
 	}
 

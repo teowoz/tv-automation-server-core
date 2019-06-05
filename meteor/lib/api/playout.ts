@@ -23,7 +23,7 @@ export namespace PlayoutAPI {
 		'segmentAdLibPieceStart'			= 'playout.segmentAdLibPieceStart',
 		'rundownBaselineAdLibPieceStart'	= 'playout.rundownBaselineAdLibPieceStart',
 		'segmentAdLibPieceStop'				= 'playout.segmentAdLibPieceStop',
-		'sourceLayerOnPartStop'				= 'playout.sourceLayerOnPartStop',
+		'sourceLayerStopActivePiece'				= 'playout.sourceLayerStopActivePiece',
 		'sourceLayerStickyPieceStart'		= 'playout.sourceLayerStickyPieceStart',
 		// 'timelineTriggerTimeUpdateCallback'	= 'playout.timelineTriggerTimeUpdateCallback',
 	}

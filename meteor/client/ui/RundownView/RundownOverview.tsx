@@ -12,7 +12,7 @@ import { ErrorBoundary } from '../../lib/ErrorBoundary'
 import { MeteorReactComponent } from '../../lib/MeteorReactComponent'
 import { RundownUtils } from '../../lib/rundown'
 import { PartExtended } from '../../../lib/Rundown'
-import { Part } from '../../../lib/collections/Parts'
+import { PartInstance } from '../../../lib/collections/PartInstances'
 
 interface SegmentUi extends Segment {
 	items: Array<PartUi>
@@ -47,7 +47,7 @@ const PartOverview: React.SFC<IPartPropsHeader> = (props: IPartPropsHeader) => {
 				'live': props.isLive,
 				'next': props.isNext,
 
-				'has-played': (props.part.startedPlayback && (props.part.getLastStartedPlayback() || 0) > 0 && (props.part.duration || 0) > 0)
+				'has-played': ((props.part.startedPlayback || 0) > 0 && (props.part.duration || 0) > 0)
 			})}
 				style={{
 					'width': (((Math.max(props.segmentLiveDurations && props.segmentLiveDurations[props.part._id] || 0, props.part.duration || props.part.expectedDuration || 0)) / (props.segmentDuration || 0)) * 100) + '%'
@@ -60,7 +60,7 @@ const PartOverview: React.SFC<IPartPropsHeader> = (props: IPartPropsHeader) => {
 				{ props.isLive &&
 					<div className='rundown__overview__segment__part__live-line'
 						style={{
-							'left': (((getCurrentTime() - (props.part.getLastStartedPlayback() || 0)) /
+							'left': (((getCurrentTime() - (props.part.startedPlayback || 0)) /
 								(Math.max(props.segmentLiveDurations && props.segmentLiveDurations[props.part._id] || 0, props.part.duration || props.part.expectedDuration || 0))) * 100) + '%'
 						}}>
 					</div>
@@ -127,8 +127,8 @@ withTracker<WithTiming<RundownOverviewProps>, RundownOverviewState, RundownOverv
 	if (rundown) {
 		segments = _.map(rundown.getSegments(), (segment) => {
 			return extendMandadory<Segment, SegmentUi>(segment, {
-				items: _.map(segment.getParts(), (part) => {
-					let sle = extendMandadory<Part, PartExtended>(part, {
+				items: _.map(segment.getPartsOrInstances(), (part) => {
+					let sle = extendMandadory<PartInstance, PartExtended>(part, {
 						pieces: [],
 						renderedDuration: 0,
 						startsAt: 0,

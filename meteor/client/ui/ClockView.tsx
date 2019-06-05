@@ -17,6 +17,7 @@ import { getCurrentTime, objectPathGet, extendMandadory } from '../../lib/lib'
 import { PieceIconContainer, PieceNameContainer } from './PieceIcons/PieceIcon'
 import { MeteorReactComponent } from '../lib/MeteorReactComponent'
 import { meteorSubscribe, PubSub } from '../../lib/api/pubsub'
+import { PartInstance } from '../../lib/collections/PartInstances'
 
 interface SegmentUi extends Segment {
 	items: Array<PartUi>
@@ -65,7 +66,7 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 		if (rundown) {
 			segments = _.map(rundown.getSegments(), (segment) => {
 				const displayDurationGroups: _.Dictionary<number> = {}
-				const parts = segment.getParts()
+				const parts = segment.getPartsOrInstances()
 				let displayDuration = 0
 
 				return extendMandadory<Segment, SegmentUi>(segment, {
@@ -77,7 +78,7 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 							displayDurationGroups[part.displayDurationGroup] = (displayDurationGroups[part.displayDurationGroup] || 0) + ((part.expectedDuration || 0) - (part.duration || 0))
 							displayDuration = Math.max(0, Math.min(part.displayDuration || part.expectedDuration || 0, part.expectedDuration || 0) || displayDurationGroups[part.displayDurationGroup])
 						}
-						return extendMandadory<Part, PartUi>(part, {
+						return extendMandadory<PartInstance, PartUi>(part, {
 							pieces: [],
 							renderedDuration: part.expectedDuration ? 0 : displayDuration,
 							startsAt: 0,
@@ -125,7 +126,7 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 					currentSegmentDuration += currentPart.renderedDuration || currentPart.expectedDuration || 0
 					currentSegmentDuration += -1 * (currentPart.duration || 0)
 					if (!currentPart.duration && currentPart.startedPlayback) {
-						currentSegmentDuration += -1 * (getCurrentTime() - (currentPart.getLastStartedPlayback() || 0))
+						currentSegmentDuration += -1 * (getCurrentTime() - (currentPart.startedPlayback || 0))
 					}
 				}
 

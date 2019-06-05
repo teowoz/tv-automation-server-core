@@ -3,7 +3,7 @@
 import { Resolver } from 'superfly-timeline'
 import * as _ from 'underscore'
 import { Part } from '../../../lib/collections/Parts'
-import { Piece } from '../../../lib/collections/Pieces'
+import { Piece, PieceBase } from '../../../lib/collections/Pieces'
 import { literal, extendMandadory, getCurrentTime, clone } from '../../../lib/lib'
 import {
 	TimelineContentTypeOther,
@@ -25,6 +25,8 @@ import { Random } from 'meteor/random'
 import { prefixAllObjectIds } from './lib'
 import { DeviceType } from 'timeline-state-resolver-types'
 import { calculatePieceTimelineEnable } from '../../../lib/Rundown'
+import { PieceInstance } from '../../../lib/collections/PieceInstances'
+import { PartInstance } from '../../../lib/collections/PartInstances'
 
 export interface PieceResolved extends Piece {
 	/** Resolved start time of the piece */
@@ -140,10 +142,8 @@ export function createPieceGroup (
 		}
 	})
 }
-export function getResolvedPieces (part: Part): Piece[] {
-	const pieces = part.getAllPieces()
-
-	const itemMap: { [key: string]: Piece } = {}
+export function getResolvedPieces<TPiece extends (Piece | PieceInstance)> (partId: string, pieces: TPiece[]): PieceInstance[] {
+	const itemMap: { [key: string]: TPiece } = {}
 	pieces.forEach(piece => itemMap[piece._id] = piece)
 
 	const objs = pieces.map(piece => clone(createPieceGroup(piece)))
@@ -159,7 +159,7 @@ export function getResolvedPieces (part: Part): Piece[] {
 		start: number
 		end: number | undefined
 		id: string
-		piece: Piece
+		piece: TPiece
 	}> = []
 
 	_.each(tlResolved.objects, (obj0) => {
@@ -185,10 +185,10 @@ export function getResolvedPieces (part: Part): Piece[] {
 	})
 
 	if (tlResolved.statistics.unresolvedCount > 0) {
-		logger.warn(`Got ${tlResolved.statistics.unresolvedCount} unresolved pieces for piece #${part._id}`)
+		logger.warn(`Got ${tlResolved.statistics.unresolvedCount} unresolved pieces for piece #${partId}`)
 	}
 	if (pieces.length !== events.length) {
-		logger.warn(`Got ${events.length} ordered pieces. Expected ${pieces.length}. for piece #${part._id}`)
+		logger.warn(`Got ${events.length} ordered pieces. Expected ${pieces.length}. for piece #${partId}`)
 	}
 
 	events.sort((a, b) => {
@@ -207,8 +207,8 @@ export function getResolvedPieces (part: Part): Piece[] {
 		}
 	})
 
-	const processedPieces: Piece[] = events.map<Piece>(event => {
-		return literal<Piece>({
+	const processedPieces: TPiece[] = events.map<TPiece>(event => {
+		return literal<TPiece>({
 			...event.piece,
 			enable: {
 				start: Math.max(0, event.start - 1),
@@ -239,12 +239,11 @@ export function convertPieceToAdLibPiece (piece: Piece): AdLibPiece {
 	// const oldId = piece._id
 	const newId = Random.id()
 	const newAdLibPiece = literal<AdLibPiece>({
-		..._.omit(piece, 'userDuration', 'timings', 'startedPlayback', 'stoppedPlayback', 'infiniteId'),
+		..._.omit(piece, 'userDuration', 'timings', 'startedPlayback', 'stoppedPlayback', 'infiniteId', 'playoutDuration', 'userDuration'),
 		_id: newId,
 		_rank: 0,
 		disabled: false,
 		dynamicallyInserted: true,
-		infiniteMode: piece.originalInfiniteMode !== undefined ? piece.originalInfiniteMode : piece.infiniteMode,
 		expectedDuration: _.isNumber(piece.enable.duration) ? piece.enable.duration : 0
 	})
 
@@ -267,7 +266,7 @@ export function convertPieceToAdLibPiece (piece: Piece): AdLibPiece {
 	return newAdLibPiece
 }
 
-export function convertAdLibToPiece (adLibPiece: AdLibPiece | Piece, part: Part, queue: boolean): Piece {
+export function convertAdLibToPiece (adLibPiece: AdLibPiece | Piece, partInstance: PartInstance, queue: boolean): PieceInstance {
 	let duration: number | string | undefined = undefined
 	if (adLibPiece['expectedDuration']) {
 		duration = adLibPiece['expectedDuration']
@@ -276,16 +275,17 @@ export function convertAdLibToPiece (adLibPiece: AdLibPiece | Piece, part: Part,
 	}
 
 	const newId = Random.id()
-	const newPiece = literal<Piece>({
-		..._.omit(adLibPiece, '_rank', 'expectedDuration', 'startedPlayback', 'stoppedPlayback'), // TODO - this could be typed stronger
+	const newPiece = literal<PieceInstance>({
+		..._.omit(adLibPiece, '_rank', 'expectedDuration', 'startedPlayback', 'stoppedPlayback', 'playoutDuration', 'userDuration'), // TODO - this could be typed stronger
 		_id: newId,
 		enable: {
 			start: (queue ? 0 : 'now'),
 			duration: duration
 		},
-		partId: part._id,
+		partId: partInstance.partId,
+		partInstanceId: partInstance._id,
 		adLibSourceId: adLibPiece._id,
-		dynamicallyInserted: !queue,
+		// dynamicallyInserted: !queue,
 		// expectedDuration: adLibPiece.expectedDuration || 0, // set duration to infinite if not set by AdLibItem
 		timings: {
 			take: [getCurrentTime()],

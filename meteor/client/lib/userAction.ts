@@ -93,7 +93,7 @@ function userActionMethodName (
 
 		case UserActionAPI.methods.storeRundownSnapshot: return t('Creating Snapshot for debugging')
 
-		case UserActionAPI.methods.sourceLayerOnPartStop: return t('Stopping source layer')
+		case UserActionAPI.methods.sourceLayerStopActivePiece: return t('Stopping source layer')
 
 		case UserActionAPI.methods.removeRundown: return t('Removing Rundown')
 		case UserActionAPI.methods.resyncRundown: return t('Re-syncing Rundown')

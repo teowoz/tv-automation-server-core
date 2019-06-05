@@ -5,7 +5,7 @@ import { Rundowns } from './Rundowns'
 import { Piece, Pieces } from './Pieces'
 import { AdLibPieces } from './AdLibPieces'
 import { Segments } from './Segments'
-import { applyClassToDocument, Time, registerCollection, normalizeArray } from '../lib'
+import { applyClassToDocument, Time, registerCollection, normalizeArray, Omit } from '../lib'
 import { RundownAPI } from '../api/rundown'
 import { checkPieceContentStatus } from '../mediaObjects'
 import { Meteor } from 'meteor/meteor'
@@ -15,8 +15,8 @@ import {
 } from 'tv-automation-sofie-blueprints-integration'
 import { PartNote, NoteType } from '../api/notes'
 
-/** A "Line" in NRK Lingo. */
-export interface DBPart extends IBlueprintPartDB {
+
+export interface DBPartBase extends Omit<IBlueprintPartDB, '_id'> {
 	/** Position inside the segment */
 	_rank: number
 
@@ -30,8 +30,12 @@ export interface DBPart extends IBlueprintPartDB {
 
 }
 
-export class Part implements DBPart {
-	public _id: string
+/** A "Line" in NRK Lingo. */
+export interface DBPart extends DBPartBase {
+	_id: string
+}
+
+export abstract class PartBase implements DBPartBase {
 	public _rank: number
 	public title: string
 	public externalId: string
@@ -70,6 +74,38 @@ export class Part implements DBPart {
 	getSegment () {
 		return Segments.findOne(this.segmentId)
 	}
+	getTimings () {
+		// // return a chronological list of timing events
+		// let events: Array<{time: Time, type: string, elapsed: Time}> = []
+		// _.each(['take', 'takeDone', 'startedPlayback', 'takeOut', 'stoppedPlayback', 'next'], (key) => {
+		// 	if (this.timings) {
+		// 		_.each(this.timings[key], (t: Time) => {
+		// 			events.push({
+		// 				time: t,
+		// 				type: key,
+		// 				elapsed: 0
+		// 			})
+		// 		})
+		// 	}
+		// })
+		// let prevEv: any = null
+		// return _.map(
+		// 	_.sortBy(events, e => e.time),
+		// 	(ev) => {
+		// 		if (prevEv) {
+		// 			ev.elapsed = ev.time - prevEv.time
+		// 		}
+		// 		prevEv = ev
+		// 		return ev
+		// 	}
+		// )
+
+	}
+}
+
+export class Part extends PartBase implements DBPart {
+	public _id: string
+
 	getPieces (selector?: MongoSelector<Piece>, options?: FindOptions) {
 		selector = selector || {}
 		options = options || {}
@@ -133,33 +169,6 @@ export class Part implements DBPart {
 			})
 		}
 		return notes
-	}
-	getTimings () {
-		// // return a chronological list of timing events
-		// let events: Array<{time: Time, type: string, elapsed: Time}> = []
-		// _.each(['take', 'takeDone', 'startedPlayback', 'takeOut', 'stoppedPlayback', 'next'], (key) => {
-		// 	if (this.timings) {
-		// 		_.each(this.timings[key], (t: Time) => {
-		// 			events.push({
-		// 				time: t,
-		// 				type: key,
-		// 				elapsed: 0
-		// 			})
-		// 		})
-		// 	}
-		// })
-		// let prevEv: any = null
-		// return _.map(
-		// 	_.sortBy(events, e => e.time),
-		// 	(ev) => {
-		// 		if (prevEv) {
-		// 			ev.elapsed = ev.time - prevEv.time
-		// 		}
-		// 		prevEv = ev
-		// 		return ev
-		// 	}
-		// )
-
 	}
 }
 

@@ -56,8 +56,8 @@ methods[PlayoutAPI.methods.rundownBaselineAdLibPieceStart] = (rundownId: string,
 methods[PlayoutAPI.methods.segmentAdLibPieceStop] = (rundownId: string, partId: string, pieceId: string) => {
 	return ServerPlayoutAPI.stopAdLibPiece(rundownId, partId, pieceId)
 }
-methods[PlayoutAPI.methods.sourceLayerOnPartStop] = (rundownId: string, partId: string, sourceLayerId: string) => {
-	return ServerPlayoutAPI.sourceLayerOnPartStop(rundownId, partId, sourceLayerId)
+methods[PlayoutAPI.methods.sourceLayerStopActivePiece] = (rundownId: string, sourceLayerId: string) => {
+	return ServerPlayoutAPI.sourceLayerStopActivePiece(rundownId, sourceLayerId)
 }
 // methods[PlayoutAPI.methods.timelineTriggerTimeUpdateCallback] = (timelineObjId: string, time: number) => {
 // 	return ServerPlayoutAPI.timelineTriggerTimeUpdateCallback(timelineObjId, time)

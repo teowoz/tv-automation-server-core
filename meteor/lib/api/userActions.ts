@@ -21,7 +21,7 @@ export namespace UserActionAPI {
 		'setInOutPoints'						= 'userAction.pieceSetInOutPoints',
 
 		'segmentAdLibPieceStart'				= 'userAction.segmentAdLibPieceStart',
-		'sourceLayerOnPartStop'					= 'userAction.sourceLayerOnPartStop',
+		'sourceLayerStopActivePiece'					= 'userAction.sourceLayerStopActivePiece',
 		'baselineAdLibPieceStart'				= 'userAction.baselineAdLibPieceStart',
 		'segmentAdLibPieceStop'					= 'userAction.segmentAdLibPieceStop',
 

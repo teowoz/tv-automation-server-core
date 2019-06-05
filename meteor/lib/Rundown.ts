@@ -9,11 +9,12 @@ import {
 } from 'tv-automation-sofie-blueprints-integration'
 import { normalizeArray, extendMandadory, literal } from './lib'
 import { Segment } from './collections/Segments'
-import { Part, Parts } from './collections/Parts'
+import { Parts } from './collections/Parts'
 import { Rundown } from './collections/Rundowns'
 import { ShowStyleBase } from './collections/ShowStyleBases'
 import { interpretExpression } from 'superfly-timeline/dist/resolver/expression'
-import { PartInstance } from './collections/PartInstances';
+import { PartInstance } from './collections/PartInstances'
+import { PieceInstance } from './collections/PieceInstances'
 
 export const DEFAULT_DISPLAY_DURATION = 3000
 
@@ -50,7 +51,7 @@ export interface ISourceLayerExtended extends ISourceLayer {
 interface IPieceExtendedDictionary {
 	[key: string]: PieceExtended
 }
-export interface PieceExtended extends Piece {
+export interface PieceExtended extends PieceInstance {
 	/** Source layer that this piece belongs to */
 	sourceLayer?: ISourceLayerExtended
 	/** Output layer that this part uses */
@@ -123,7 +124,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 
 	// fetch all the parts for the segment
 	let partsE: Array<PartExtended> = []
-	const parts = segment.getParts()
+	const parts = segment.getPartsOrInstances()
 
 	if (parts.length > 0) {
 		if (checkFollowingSegment) {
@@ -140,7 +141,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 					partId: followingPart._id
 				}).fetch()
 
-				followingPart = extendMandadory<Part, PartExtended>(followingPart, {
+				followingPart = extendMandadory<PartInstance, PartExtended>(PartInstance.FromPart(followingPart), {
 					pieces: _.map(pieces, (piece) => {
 						return extendMandadory<Piece, PieceExtended>(piece, {
 							// sourceLayer: ISourceLayerExtended,
@@ -202,7 +203,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 
 			// extend objects to match the Extended interface
 			let partE: PartExtended = extendMandadory(part, {
-				pieces: _.map(Pieces.find({ partId: part._id }).fetch(), (piece) => {
+				pieces: _.map(Pieces.find({ partId: part.partId }).fetch(), (piece) => {
 					return extendMandadory<Piece, PieceExtended>(piece, {
 						renderedDuration: 0,
 						renderedInPoint: 0
@@ -218,11 +219,11 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 			})
 
 			// set the flags for isLiveSegment, isNextSegment, autoNextPart, hasAlreadyPlayed
-			if (rundown.currentPartId === partE._id) {
+			if (rundown.currentPartInstanceId === partE._id) {
 				isLiveSegment = true
 				currentLivePart = partE
 			}
-			if (rundown.nextPartId === partE._id) {
+			if (rundown.nextPartId === partE.partId) {
 				isNextSegment = true
 			}
 			autoNextPart = (
@@ -442,8 +443,8 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 		segmentExtended.outputLayers = outputLayers
 		segmentExtended.sourceLayers = sourceLayers
 
-		if (isNextSegment && !isLiveSegment && !autoNextPart && rundown.currentPartId) {
-			const currentOtherPart = Parts.findOne(rundown.currentPartId)
+		if (isNextSegment && !isLiveSegment && !autoNextPart && rundown.currentPartInstanceId) {
+			const currentOtherPart = Parts.findOne(rundown.currentPartInstanceId)
 			if (currentOtherPart && currentOtherPart.expectedDuration && currentOtherPart.autoNext) {
 				autoNextPart = true
 			}

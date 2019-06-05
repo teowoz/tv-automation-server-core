@@ -1,6 +1,6 @@
 import { Mongo } from 'meteor/mongo'
 import * as _ from 'underscore'
-import { Time, applyClassToDocument, getCurrentTime, registerCollection, normalizeArray, waitForPromiseAll, makePromise } from '../lib'
+import { Time, applyClassToDocument, getCurrentTime, registerCollection, normalizeArray, waitForPromiseAll, makePromise, asyncCollectionFindFetch } from '../lib'
 import { Segments, DBSegment, Segment } from './Segments'
 import { Parts, Part } from './Parts'
 import { FindOptions, MongoSelector, TransformedCollection } from '../typings/meteor'
@@ -16,6 +16,8 @@ import { ShowStyleBase, ShowStyleBases } from './ShowStyleBases'
 import { RundownNote } from '../api/notes'
 import { IngestDataCache } from './IngestDataCache'
 import { ExpectedMediaItems } from './ExpectedMediaItems'
+import { PartInstance, PartInstances } from './PartInstances'
+import { PieceInstance, PieceInstances } from './PieceInstances'
 
 export enum RundownHoldState {
 	NONE = 0,
@@ -53,15 +55,15 @@ export interface DBRundown extends IBlueprintRundownDB {
 	// There should be something like a Owner user here somewhere?
 	active?: boolean
 	/** the id of the Live Part - if empty, no part in this rundown is live */
-	currentPartId: string | null
+	currentPartInstanceId: string | null
 	/** the id of the Next Part - if empty, no segment will follow Live Part */
-	nextPartId: string | null
+	nextPartInstanceId: string | null
 	/** The time offset of the next line */
 	nextTimeOffset?: number | null
 	/** if nextPartId was set manually (ie from a user action) */
 	nextPartManual?: boolean
 	/** the id of the Previous Part */
-	previousPartId: string | null
+	previousPartInstanceId: string | null
 
 	/** Actual time of playback starting */
 	startedPlayback?: Time
@@ -101,10 +103,10 @@ export class Rundown implements DBRundown {
 	public rehearsal?: boolean
 	public unsynced?: boolean
 	public unsyncedTime?: Time
-	public previousPartId: string | null
+	public previousPartInstanceId: string | null
 	public nextPartManual?: boolean
-	public currentPartId: string | null
-	public nextPartId: string | null
+	public currentPartInstanceId: string | null
+	public nextPartInstanceId: string | null
 	public nextTimeOffset?: number
 	public startedPlayback?: Time
 	public notifiedCurrentPlayingPartExternalId?: string
@@ -251,6 +253,51 @@ export class Rundown implements DBRundown {
 			pieces
 		}
 	}
+	fetchRundownInstancesData (): RundownInstancesData {
+
+		const partInstanceIds = _.compact([
+			this.previousPartInstanceId,
+			this.currentPartInstanceId,
+			this.nextPartInstanceId
+		])
+
+		// Do fetches in parallell:
+		let ps: [
+			Promise<PartInstance[]>,
+			Promise<PieceInstance[]>
+		] = [
+			asyncCollectionFindFetch(PartInstances, { _id: { $in: partInstanceIds } }),
+			asyncCollectionFindFetch(PieceInstances, { partInstanceId: { $in: partInstanceIds } })
+		]
+		let r = waitForPromiseAll(ps as any)
+
+
+		let parts: PartInstance[] = r[0]
+		let pieces: PieceInstance[] = r[1]
+
+		const getPart = (partInstanceId: string | null) => {
+			if (partInstanceId === null) {
+				const partInstance = _.find(parts, p => p._id === partInstanceId)
+				if (partInstance) {
+					return {
+						part: partInstance,
+						pieces: _.filter(pieces, p => p.partInstanceId === partInstanceId)
+					}
+				} else {
+					return undefined
+				}
+			} else {
+				return undefined
+			}
+		}
+
+		return {
+			rundown: this,
+			previousPart: getPart(this.previousPartInstanceId),
+			currentPart: getPart(this.currentPartInstanceId),
+			nextPart: getPart(this.nextPartInstanceId)
+		}
+	}
 	getNotes (): Array<RundownNote> {
 		let notes: Array<RundownNote> = []
 		notes = notes.concat(this.notes || [])
@@ -269,7 +316,24 @@ export interface RundownData {
 	segmentsMap: {[id: string]: Segment}
 	parts: Array<Part>
 	partsMap: {[id: string]: Part}
+	// partInstancess: Array<PartInstance>
+	// partInstancesMap: {[id: string]: PartInstance}
+	// partInstances: {
+	// 	previous: PartInstance | undefined
+	// 	current: PartInstance | undefined
+	// }
 	pieces: Array<Piece>
+}
+
+export interface PartInstanceData {
+	part: PartInstance
+	pieces: Array<PieceInstance>
+}
+export interface RundownInstancesData {
+	rundown: Rundown
+	previousPart: PartInstanceData | undefined
+	currentPart: PartInstanceData | undefined
+	nextPart: PartInstanceData | undefined
 }
 
 // export const Rundowns = new Mongo.Collection<Rundown>('rundowns', {transform: (doc) => applyClassToDocument(Rundown, doc) })

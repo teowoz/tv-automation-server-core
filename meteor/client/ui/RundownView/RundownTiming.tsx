@@ -8,7 +8,7 @@ import { Part, Parts } from '../../../lib/collections/Parts'
 import { getCurrentTime, literal } from '../../../lib/lib'
 import { RundownUtils } from '../../lib/rundown'
 import { MeteorReactComponent } from '../../lib/MeteorReactComponent'
-import { PartInstance, DBPartInstance } from '../../../lib/collections/PartInstances';
+import { PartInstance, DBPartInstance } from '../../../lib/collections/PartInstances'
 
 export namespace RundownTiming {
 	/**
@@ -122,7 +122,7 @@ export const RundownTimingProvider =
 withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTimingProviderTrackedProps>(
 (props) => {
 	// TODO - load instances when possible
-	let parts: Array<Part> = []
+	let parts: Array<PartInstance> = []
 	if (props.rundown) {
 		parts = _.map(Parts.find({
 			'rundownId': props.rundown._id,
@@ -131,7 +131,7 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 				'_rank': 1
 			}
 		}).fetch(), part => {
-			return new PartInstance(literal<DBPartInstance>(part))
+			return PartInstance.FromPart(part)
 		})
 	}
 	return {

@@ -1,21 +1,22 @@
 import { Mongo } from 'meteor/mongo'
 import * as _ from 'underscore'
 import { TransformedCollection } from '../typings/meteor'
-import { applyClassToDocument, Time, registerCollection, literal } from '../lib'
+import { applyClassToDocument, Time, registerCollection, literal, Omit } from '../lib'
 import { Meteor } from 'meteor/meteor'
 import {
 	BlueprintRuntimeArguments,
 	IBlueprintPartDBTimings,
 } from 'tv-automation-sofie-blueprints-integration'
-import { DBPart, Part } from './Parts'
+import { DBPartBase, PartBase, DBPart } from './Parts'
 
-export interface DBPartInstance extends DBPart {
+export interface DBPartInstance extends DBPartBase {
+	_id: string
 	partId: string
 
 	/** Set when this instance has been reset, and was for a previous playthrough */
 	isReset?: boolean
 
-	/** Whether the instance has started playback 
+	/** Whether the instance has started playback
 	 * This is set from a callback from the playout gateway
 	 */
 	startedPlayback?: number // TODO - flatten out timings obj
@@ -24,12 +25,15 @@ export interface DBPartInstance extends DBPart {
 	 */
 	stoppedPlayback?: number // TODO - flatten out timings obj
 
+	nextTime?: number
+	takeTime?: number // TODO - flatten out timings obj
 	playOffset?: number // TODO - flatten out timings obj
+	takeDone?: number
 
 	/** The time the system played back this part, null if not yet finished playing, in milliseconds.
 	 * This is set when Take:ing the next part
 	 */
-	duration?: number
+	duration?: number // TODO - remove and replace uses with stoppedPlayback - startedPlayback?
 
 	/** if the part is inserted after another (for adlibbing) */
 	afterPart?: string
@@ -52,15 +56,20 @@ export interface PartTimings extends IBlueprintPartDBTimings {
 	playOffset: Array<Time>
 }
 
-export class PartInstance extends Part implements DBPartInstance {
+export class PartInstance extends PartBase implements DBPartInstance {
+	public _id: string
 	public partId: string
 	public isReset?: boolean
 
 	public startedPlayback?: number
 	public stoppedPlayback?: number
 	public playOffset?: number
+	public nextTime?: number
+	public takeTime?: number
+	public takeDone?: number
+
 	public duration?: number
-	public timings?: PartTimings
+	public timings?: PartTimings // TOD remove
 	public afterPart?: string
 	public dirty?: boolean
 
@@ -73,7 +82,8 @@ export class PartInstance extends Part implements DBPartInstance {
 	static FromPart (part: DBPart) {
 		return new PartInstance(literal<DBPartInstance>({
 			...part,
-			partId: part._id
+			partId: part._id,
+			_id: ''
 		}))
 	}
 }
