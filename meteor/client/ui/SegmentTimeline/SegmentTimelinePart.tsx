@@ -529,6 +529,13 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 					'next': this.state.isNext
 				})} data-obj-id={this.props.part._id}
 					style={this.getLayerStyle()}
+					data-debug={[
+						this.props.scrollLeft,
+						this.props.scrollWidth,
+						this.props.part,
+						this.getPartStartsAt(),
+						this.getPartDuration()
+					].join(' ')}
 				>
 					{ /* render it empty, just to take up space */}
 				</div>
