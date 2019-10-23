@@ -441,6 +441,15 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 
 					'duration-settling': this.state.isDurationSettling
 				})} data-obj-id={this.props.part._id}
+					data-debug={[
+							this.props.scrollLeft,
+							this.props.scrollWidth,
+							this.props.part,
+							this.getPartStartsAt(),
+							this.getPartDuration(),
+							((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.part._id],
+							this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.firstPartInSegment._id] : undefined
+						].join(' ')}
 					id={SegmentTimelinePartElementId + this.props.part._id}
 					style={this.getLayerStyle()}
 				>
