@@ -451,6 +451,7 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 							this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.firstPartInSegment._id] : undefined,
 							this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayDurations || {})[this.props.firstPartInSegment._id] : undefined
 						].join(' ')}
+					data-debug-starts-at={JSON.stringify((this.props.timingDurations || {}).partDisplayStartsAt, undefined, 2)}
 					id={SegmentTimelinePartElementId + this.props.part._id}
 					style={this.getLayerStyle()}
 				>
@@ -550,6 +551,7 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 						this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.firstPartInSegment._id] : undefined,
 						this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayDurations || {})[this.props.firstPartInSegment._id] : undefined
 					].join(' ')}
+					data-debug-starts-at={JSON.stringify((this.props.timingDurations || {}).partDisplayStartsAt, undefined, 2)}
 				>
 					{ /* render it empty, just to take up space */}
 				</div>
