@@ -444,11 +444,12 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 					data-debug={[
 							this.props.scrollLeft,
 							this.props.scrollWidth,
-							this.props.part,
 							this.getPartStartsAt(),
 							this.getPartDuration(),
 							((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.part._id],
-							this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.firstPartInSegment._id] : undefined
+							this.props.firstPartInSegment ? this.props.firstPartInSegment._id : undefined,
+							this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.firstPartInSegment._id] : undefined,
+							this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayDurations || {})[this.props.firstPartInSegment._id] : undefined
 						].join(' ')}
 					id={SegmentTimelinePartElementId + this.props.part._id}
 					style={this.getLayerStyle()}
@@ -542,11 +543,12 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 					data-debug={[
 						this.props.scrollLeft,
 						this.props.scrollWidth,
-						this.props.part,
 						this.getPartStartsAt(),
 						this.getPartDuration(),
 						((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.part._id],
-						this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.firstPartInSegment._id] : undefined
+						this.props.firstPartInSegment ? this.props.firstPartInSegment._id : undefined,
+						this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.firstPartInSegment._id] : undefined,
+						this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayDurations || {})[this.props.firstPartInSegment._id] : undefined
 					].join(' ')}
 				>
 					{ /* render it empty, just to take up space */}
