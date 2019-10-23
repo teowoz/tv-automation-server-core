@@ -535,7 +535,9 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 						this.props.scrollWidth,
 						this.props.part,
 						this.getPartStartsAt(),
-						this.getPartDuration()
+						this.getPartDuration(),
+						((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.part._id],
+						this.props.firstPartInSegment ? ((this.props.timingDurations || {}).partDisplayStartsAt || {})[this.props.firstPartInSegment._id] : undefined
 					].join(' ')}
 				>
 					{ /* render it empty, just to take up space */}
