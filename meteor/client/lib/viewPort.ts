@@ -39,6 +39,7 @@ function quitFocusOnPart () {
 }
 
 export function scrollToPart (partId: string, forceScroll?: boolean, noAnimation?: boolean): Promise<boolean> {
+	// TODO - update for partInstances
 	// TODO: do scrolling within segment as well?
 	quitFocusOnPart()
 	let part = Parts.findOne(partId)

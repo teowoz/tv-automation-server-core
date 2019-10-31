@@ -21,7 +21,6 @@ import {
 import { RundownUtils } from '../../lib/rundown'
 import { Translated } from '../../lib/ReactMeteorData/ReactMeteorData'
 import { ErrorBoundary } from '../../lib/ErrorBoundary'
-import { scrollToSegment } from '../../lib/viewPort'
 
 // @ts-ignore Not recognized by Typescript
 import * as Zoom_In_MouseOut from './Zoom_In_MouseOut.json'
@@ -162,7 +161,7 @@ const SegmentTimelineZoom = class extends React.Component<IProps & IZoomPropsHea
 					followLiveLine={this.props.followLiveLine}
 					autoNextPart={this.props.autoNextPart}
 					liveLineHistorySize={this.props.liveLineHistorySize}
-					livePosition={this.props.segment._id === this.props.rundown.currentPartId && part.startedPlayback && part.getLastStartedPlayback() ? this.props.livePosition - (part.getLastStartedPlayback() || 0) : null}
+					livePosition={this.props.segment._id === this.props.rundown.currentPartInstanceId && part.timings.startedPlayback ? this.props.livePosition - part.timings.startedPlayback : null}
 					isLastInSegment={false}
 					isLastSegment={false} />
 			)
@@ -350,7 +349,7 @@ export class SegmentTimelineClass extends React.Component<Translated<IProps>, IS
 	getSegmentContext = (props) => {
 		const ctx = {
 			segment: this.props.segment,
-			part: this.props.parts.length > 0 ? this.props.parts[0] : null
+			partInstance: this.props.parts.length > 0 ? this.props.parts[0] : null
 		}
 
 		if (this.props.onContextMenu && typeof this.props.onContextMenu === 'function') {
@@ -549,7 +548,7 @@ export class SegmentTimelineClass extends React.Component<Translated<IProps>, IS
 									!this.props.isLiveSegment &&
 									(
 										this.props.isNextSegment ?
-											this.props.rundown.nextPartId :
+											this.props.rundown.nextPartInstanceId :
 											this.props.parts[0]._id
 									)
 								) || undefined}

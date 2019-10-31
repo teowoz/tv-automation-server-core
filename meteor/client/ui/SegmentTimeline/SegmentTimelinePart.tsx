@@ -67,7 +67,7 @@ class SourceLayer extends React.Component<ISourceLayerProps> {
 
 		const ctx = {
 			segment: this.props.segment,
-			part: this.props.part,
+			partInstance: this.props.part,
 			partDocumentOffset,
 			timeScale: this.props.timeScale,
 			mousePosition: this.mousePosition,
@@ -260,9 +260,9 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 	constructor (props: Translated<WithTiming<IProps>>) {
 		super(props)
 
-		const isLive = (this.props.rundown.currentPartId === this.props.part._id)
-		const isNext = (this.props.rundown.nextPartId === this.props.part._id)
-		const startedPlayback = this.props.part.startedPlayback
+		const isLive = (this.props.rundown.currentPartInstanceId === this.props.part._id)
+		const isNext = (this.props.rundown.nextPartInstanceId === this.props.part._id)
+		const startedPlayback = this.props.part.timings.startedPlayback !== undefined
 
 		this.state = {
 			isLive,
@@ -284,10 +284,9 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 	}
 
 	static getDerivedStateFromProps (nextProps: IProps & RundownTiming.InjectedROTimingProps) {
-		const isLive = (nextProps.rundown.currentPartId === nextProps.part._id)
-		const isNext = (nextProps.rundown.nextPartId === nextProps.part._id)
-
-		const startedPlayback = nextProps.part.startedPlayback
+		const isLive = (nextProps.rundown.currentPartInstanceId === nextProps.part._id)
+		const isNext = (nextProps.rundown.nextPartInstanceId === nextProps.part._id)
+		const startedPlayback = nextProps.part.timings.startedPlayback !== undefined
 
 		const isDurationSettling = !!nextProps.rundown.active && !isLive && !!startedPlayback && !nextProps.part.duration
 
@@ -320,11 +319,11 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 	}
 
 	static getCurrentLiveLinePosition (part: PartUi, currentTime: number) {
-		if (part.startedPlayback && part.getLastStartedPlayback()) {
+		if (part.timings.startedPlayback) {
 			if (part.duration) {
 				return part.duration
 			} else {
-				return currentTime - (part.getLastStartedPlayback() || 0) + (part.getLastPlayOffset() || 0)
+				return currentTime - part.timings.startedPlayback + (part.timings.playOffset || 0)
 			}
 		} else {
 			return 0
@@ -406,8 +405,8 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 							rundown={this.props.rundown}
 							startsAt={this.getPartStartsAt() || this.props.part.startsAt || 0}
 							duration={this.getPartDuration()}
-							isLiveLine={this.props.rundown.currentPartId === part._id ? true : false}
-							isNextLine={this.props.rundown.nextPartId === part._id ? true : false}
+							isLiveLine={this.props.rundown.currentPartInstanceId === part._id ? true : false}
+							isNextLine={this.props.rundown.nextPartInstanceId === part._id ? true : false}
 							timeScale={this.props.timeScale}
 							autoNextPart={this.props.autoNextPart}
 							liveLinePadding={SegmentTimelinePart0.getLiveLineTimePadding(this.props.timeScale)} />
@@ -431,7 +430,7 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 	render () {
 		const { t } = this.props
 
-		const isEndOfShow = this.props.isLastSegment && this.props.isLastInSegment && (!this.state.isLive || (this.state.isLive && !this.props.rundown.nextPartId))
+		const isEndOfShow = this.props.isLastSegment && this.props.isLastInSegment && (!this.state.isLive || (this.state.isLive && !this.props.rundown.nextPartInstanceId))
 
 		if (this.isInsideViewport()) {
 			return (
@@ -500,7 +499,7 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 					{this.renderTimelineOutputGroups(this.props.part)}
 					{this.props.isLastInSegment && <div className={ClassNames('segment-timeline__part__nextline', 'segment-timeline__part__nextline--endline', {
 						'auto-next': this.props.part.autoNext,
-						'is-next': this.state.isLive && (!this.props.isLastSegment && !this.props.isLastInSegment || !!this.props.rundown.nextPartId),
+						'is-next': this.state.isLive && (!this.props.isLastSegment && !this.props.isLastInSegment || !!this.props.rundown.nextPartInstanceId),
 						'show-end': isEndOfShow
 					})}>
 						<div className={ClassNames('segment-timeline__part__nextline__label', {

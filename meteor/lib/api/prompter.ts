@@ -12,7 +12,7 @@ export enum PrompterMethods {
 export interface PrompterDataLine {
 	text: string
 	segmentId: string
-	partId: string
+	partInstanceId: string
 }
 export interface PrompterData {
 	lines: Array<PrompterDataLine>

@@ -16,9 +16,10 @@ import { getCurrentTime, objectPathGet, extendMandadory } from '../../lib/lib'
 import { PieceIconContainer, PieceNameContainer } from './PieceIcons/PieceIcon'
 import { MeteorReactComponent } from '../lib/MeteorReactComponent'
 import { meteorSubscribe, PubSub } from '../../lib/api/pubsub'
+import { PartInstances, PartInstance, WrapPartToTemporaryInstance } from '../../lib/collections/PartInstances'
 
 interface SegmentUi extends Segment {
-	items: Array<PartUi>
+	partInstances: Array<PartUi>
 }
 
 interface TimeMap {
@@ -64,11 +65,12 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 		if (rundown) {
 			segments = _.map(rundown.getSegments(), (segment) => {
 				const displayDurationGroups: _.Dictionary<number> = {}
-				const parts = segment.getParts()
+				const partInstances = segment.getPartInstances()
+				const parts = _.map(segment.getParts(), part => partInstances.find(instance => instance.partId === part._id) || WrapPartToTemporaryInstance(part))
 				let displayDuration = 0
 
 				return extendMandadory<Segment, SegmentUi>(segment, {
-					items: _.map(parts, (part, index) => {
+					partInstances: _.map(parts, (part, index) => {
 						if (part.displayDurationGroup && (
 							(displayDurationGroups[part.displayDurationGroup]) ||
 							// or there is a following member of this displayDurationGroup
@@ -76,7 +78,7 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 							displayDurationGroups[part.displayDurationGroup] = (displayDurationGroups[part.displayDurationGroup] || 0) + ((part.expectedDuration || 0) - (part.duration || 0))
 							displayDuration = Math.max(0, Math.min(part.displayDuration || part.expectedDuration || 0, part.expectedDuration || 0) || displayDurationGroups[part.displayDurationGroup])
 						}
-						return extendMandadory<Part, PartUi>(part, {
+						return extendMandadory<PartInstance, PartUi>(part, {
 							pieces: [],
 							renderedDuration: part.expectedDuration ? 0 : displayDuration,
 							startsAt: 0,
@@ -103,6 +105,9 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 				this.subscribe(PubSub.parts, {
 					rundownId: this.props.rundownId
 				})
+				this.subscribe(PubSub.partInstances, {
+					rundownId: this.props.rundownId
+				})
 			}
 
 			render () {
@@ -112,9 +117,9 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 					let currentPart: PartUi | undefined
 					let currentSegment: SegmentUi | undefined
 					for (const segment of segments) {
-						if (segment.items) {
-							for (const item of segment.items) {
-								if (item._id === rundown.currentPartId) {
+						if (segment.partInstances) {
+							for (const item of segment.partInstances) {
+								if (item._id === rundown.currentPartInstanceId) {
 									currentSegment = segment
 									currentPart = item
 								}
@@ -125,17 +130,17 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 					if (currentPart) {
 						currentSegmentDuration += currentPart.renderedDuration || currentPart.expectedDuration || 0
 						currentSegmentDuration += -1 * (currentPart.duration || 0)
-						if (!currentPart.duration && currentPart.startedPlayback) {
-							currentSegmentDuration += -1 * (getCurrentTime() - (currentPart.getLastStartedPlayback() || 0))
+						if (!currentPart.duration && currentPart.timings.startedPlayback) {
+							currentSegmentDuration += -1 * (getCurrentTime() - currentPart.timings.startedPlayback)
 						}
 					}
 
 					let nextPart: PartUi | undefined
 					let nextSegment: SegmentUi | undefined
 					for (const segment of segments) {
-						if (segment.items) {
-							for (const item of segment.items) {
-								if (item._id === rundown.nextPartId) {
+						if (segment.partInstances) {
+							for (const item of segment.partInstances) {
+								if (item._id === rundown.nextPartInstanceId) {
 									nextSegment = segment
 									nextPart = item
 								}
@@ -221,6 +226,7 @@ interface IPropsHeader extends InjectedTranslateProps {
 	rundown: Rundown
 	segments: Array<Segment>
 	parts: Array<Part>
+	partInstances: Array<PartInstance>
 	match: {
 		params: {
 			studioId: string
@@ -255,11 +261,13 @@ export const ClockView = translate()(withTracker(function (props: IPropsHeader) 
 		}
 	}).fetch() : undefined
 	let parts = rundown ? Parts.find({ rundownId: rundown._id }).fetch() : undefined
+	let partInstances = rundown ? PartInstances.find({ rundownId: rundown._id }).fetch() : undefined
 	// let rundownDurations = calculateDurations(rundown, parts)
 	return {
 		rundown,
 		segments,
-		parts
+		parts,
+		partInstances
 	}
 })(
 	class extends MeteorReactComponent<WithTiming<IPropsHeader>, IStateHeader> {
@@ -286,6 +294,9 @@ export const ClockView = translate()(withTracker(function (props: IPropsHeader) 
 					rundownId: rundown._id
 				})
 				this.subscribe(PubSub.parts, {
+					rundownId: rundown._id
+				})
+				this.subscribe(PubSub.partInstances, {
 					rundownId: rundown._id
 				})
 				this.subscribe(PubSub.pieces, {

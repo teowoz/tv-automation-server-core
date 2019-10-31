@@ -13,7 +13,7 @@ import { getResolvedSegment,
 	IOutputLayerExtended,
 	ISourceLayerExtended,
 	PieceExtended,
-	PartExtended
+	PartInstanceExtended
 } from '../../../lib/Rundown'
 import { RundownViewEvents } from '../RundownView'
 import { ShowStyleBase } from '../../../lib/collections/ShowStyleBases'
@@ -36,7 +36,7 @@ export interface SegmentUi extends Segment {
 		[key: string]: ISourceLayerUi
 	}
 }
-export interface PartUi extends PartExtended {
+export interface PartUi extends PartInstanceExtended {
 }
 export interface IOutputLayerUi extends IOutputLayerExtended {
 	/** Is output layer group collapsed */
@@ -154,13 +154,13 @@ export const SegmentTimelineContainer = withTracker<IProps, IState, ITrackedProp
 		(typeof props.rundown !== typeof nextProps.rundown) ||
 		(
 			(
-				props.rundown.currentPartId !== nextProps.rundown.currentPartId ||
-				props.rundown.nextPartId !== nextProps.rundown.nextPartId
+				props.rundown.currentPartInstanceId !== nextProps.rundown.currentPartInstanceId ||
+				props.rundown.nextPartInstanceId !== nextProps.rundown.nextPartInstanceId
 			) && (
 				data.parts &&
 				(
-					data.parts.find(i => (i._id === props.rundown.currentPartId) || (i._id === nextProps.rundown.currentPartId)) ||
-					data.parts.find(i => (i._id === props.rundown.nextPartId) || (i._id === nextProps.rundown.nextPartId))
+					data.parts.find(i => (i._id === props.rundown.currentPartInstanceId) || (i._id === nextProps.rundown.currentPartInstanceId)) ||
+					data.parts.find(i => (i._id === props.rundown.nextPartInstanceId) || (i._id === nextProps.rundown.nextPartInstanceId))
 				)
 			)
 		) ||
@@ -191,7 +191,6 @@ export const SegmentTimelineContainer = withTracker<IProps, IState, ITrackedProp
 
 	isLiveSegment: boolean
 	isVisible: boolean
-	rundownCurrentSegmentId: string | null
 	timelineDiv: HTMLDivElement
 	intersectionObserver: IntersectionObserver | undefined
 	mountedTime: number
@@ -221,11 +220,13 @@ export const SegmentTimelineContainer = withTracker<IProps, IState, ITrackedProp
 		this.subscribe(PubSub.parts, {
 			segmentId: this.props.segmentId
 		})
+		this.subscribe(PubSub.partInstances, {
+			segmentId: this.props.segmentId
+		})
 		SpeechSynthesiser.init()
 	}
 
 	componentDidMount () {
-		this.rundownCurrentSegmentId = this.props.rundown.currentPartId
 		if (this.isLiveSegment === true) {
 			this.onFollowLiveLine(true, {})
 			this.startLive()
@@ -240,7 +241,6 @@ export const SegmentTimelineContainer = withTracker<IProps, IState, ITrackedProp
 	}
 
 	componentDidUpdate (prevProps) {
-		this.rundownCurrentSegmentId = this.props.rundown.currentPartId
 		if (this.isLiveSegment === false && this.props.isLiveSegment === true) {
 			this.isLiveSegment = true
 			this.onFollowLiveLine(true, {})
@@ -314,10 +314,10 @@ export const SegmentTimelineContainer = withTracker<IProps, IState, ITrackedProp
 					- this.context.durations.partDisplayStartsAt[this.props.parts[0]._id])
 				|| 0
 
-			const lastStartedPlayback = this.props.currentLivePart.getLastStartedPlayback()
-			const lastPlayOffset = this.props.currentLivePart.getLastPlayOffset() || 0
+			const lastStartedPlayback = this.props.currentLivePart.timings.startedPlayback
+			const lastPlayOffset = this.props.currentLivePart.timings.playOffset || 0
 
-			let newLivePosition = this.props.currentLivePart.startedPlayback && lastStartedPlayback ?
+			let newLivePosition = lastStartedPlayback ?
 				(e.detail.currentTime - lastStartedPlayback + partOffset) :
 				(partOffset + lastPlayOffset)
 
@@ -328,7 +328,7 @@ export const SegmentTimelineContainer = withTracker<IProps, IState, ITrackedProp
 
 			this.setState(_.extend({
 				livePosition: newLivePosition,
-				displayTimecode: this.props.currentLivePart.startedPlayback && lastStartedPlayback ?
+				displayTimecode: lastStartedPlayback ?
 					(e.detail.currentTime - (lastStartedPlayback + onAirPartDuration)) :
 					(onAirPartDuration * -1)
 			}, this.state.followLiveLine ? {

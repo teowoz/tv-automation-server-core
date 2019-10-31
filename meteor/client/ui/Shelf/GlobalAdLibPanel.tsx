@@ -423,7 +423,7 @@ export const GlobalAdLibPanel = translateWithTracker<IProps, IState, ITrackedPro
 	}
 
 	onToggleSticky = (sourceLayerId: string, e: any) => {
-		if (this.props.rundown && this.props.rundown.currentPartId && this.props.rundown.active) {
+		if (this.props.rundown && this.props.rundown.currentPartInstanceId && this.props.rundown.active) {
 			const { t } = this.props
 			doUserAction(t, e, UserActionAPI.methods.sourceLayerStickyPieceStart, [this.props.rundown._id, sourceLayerId])
 		}
@@ -449,18 +449,18 @@ export const GlobalAdLibPanel = translateWithTracker<IProps, IState, ITrackedPro
 			return
 		}
 
-		if (this.props.rundown && this.props.rundown.currentPartId && piece.isGlobal) {
+		if (this.props.rundown && this.props.rundown.currentPartInstanceId && piece.isGlobal) {
 			const { t } = this.props
-			doUserAction(t, e, UserActionAPI.methods.baselineAdLibPieceStart, [this.props.rundown._id, this.props.rundown.currentPartId, piece._id, queue || false])
+			doUserAction(t, e, UserActionAPI.methods.baselineAdLibPieceStart, [this.props.rundown._id, this.props.rundown.currentPartInstanceId, piece._id, queue || false])
 		}
 	}
 
 	onClearAllSourceLayer = (sourceLayer: ISourceLayer, e: any) => {
 		// console.log(sourceLayer)
 
-		if (this.props.rundown && this.props.rundown.currentPartId) {
+		if (this.props.rundown && this.props.rundown.currentPartInstanceId) {
 			const { t } = this.props
-			doUserAction(t, e, UserActionAPI.methods.sourceLayerOnPartStop, [this.props.rundown._id, this.props.rundown.currentPartId, sourceLayer._id])
+			doUserAction(t, e, UserActionAPI.methods.sourceLayerOnPartStop, [this.props.rundown._id, this.props.rundown.currentPartInstanceId, sourceLayer._id])
 		}
 	}
 

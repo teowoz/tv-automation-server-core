@@ -1,12 +1,13 @@
 import * as _ from 'underscore'
 import { applyClassToDocument, registerCollection } from '../lib'
-import { Parts } from './Parts'
+import { Parts, DBPart } from './Parts'
 import { Rundowns } from './Rundowns'
 import { FindOptions, MongoSelector, TransformedCollection } from '../typings/meteor'
 import { Meteor } from 'meteor/meteor'
 import { IBlueprintSegmentDB } from 'tv-automation-sofie-blueprints-integration'
 import { PartNote } from '../api/notes'
 import { createMongoCollection } from './lib'
+import { DBPartInstance, PartInstances } from './PartInstances'
 
 /** A "Title" in NRK Lingo / "Stories" in ENPS Lingo. */
 export interface DBSegment extends IBlueprintSegmentDB {
@@ -42,7 +43,7 @@ export class Segment implements DBSegment {
 	getRundown () {
 		return Rundowns.findOne(this.rundownId)
 	}
-	getParts (selector?: MongoSelector<DBSegment>, options?: FindOptions) {
+	getParts (selector?: MongoSelector<DBPart>, options?: FindOptions) {
 		selector = selector || {}
 		options = options || {}
 		return Parts.find(
@@ -53,6 +54,19 @@ export class Segment implements DBSegment {
 			_.extend({
 				sort: { _rank: 1 }
 			}, options)
+		).fetch()
+	}
+	getPartInstances (selector?: MongoSelector<DBPartInstance>, options?: FindOptions) {
+		return PartInstances.find(
+			{
+				rundownId: this.rundownId,
+				segmentId: this._id,
+				...selector
+			},
+			{
+				sort: { _rank: 1 },
+				...options
+			}
 		).fetch()
 	}
 	getNotes (includeParts?: boolean, runtimeNotes?: boolean) {

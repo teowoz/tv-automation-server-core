@@ -35,6 +35,7 @@ import { DashboardPieceButton } from './DashboardPieceButton'
 import { ensureHasTrailingSlash } from '../../lib/lib'
 import { Studio } from '../../../lib/collections/Studios'
 import { Piece, Pieces } from '../../../lib/collections/Pieces'
+import { PartInstance, PartInstances } from '../../../lib/collections/PartInstances'
 
 interface IState {
 	outputLayers: {
@@ -59,9 +60,10 @@ interface IDashboardPanelTrackedProps {
 }
 
 export const DashboardPanel = translateWithTracker<IAdLibPanelProps & IDashboardPanelProps, IState, IAdLibPanelTrackedProps & IDashboardPanelTrackedProps>((props: Translated<IAdLibPanelProps>) => {
-	const unfinishedPieces = _.groupBy(props.rundown.currentPartId ? Pieces.find({
+	const currentPartIntance = props.rundown.currentPartInstanceId ? PartInstances.findOne(props.rundown.currentPartInstanceId) : undefined
+	const unfinishedPieces = _.groupBy(currentPartIntance ? Pieces.find({
 		rundownId: props.rundown._id,
-		partId: props.rundown.currentPartId,
+		partId: currentPartIntance.partId,
 		startedPlayback: {
 			$exists: true
 		},
@@ -128,6 +130,9 @@ export const DashboardPanel = translateWithTracker<IAdLibPanelProps & IDashboard
 			rundownId: this.props.rundown._id
 		})
 		this.subscribe(PubSub.parts, {
+			rundownId: this.props.rundown._id
+		})
+		this.subscribe(PubSub.partInstances, {
 			rundownId: this.props.rundown._id
 		})
 		this.subscribe(PubSub.pieces, {
@@ -288,15 +293,15 @@ export const DashboardPanel = translateWithTracker<IAdLibPanelProps & IDashboard
 			console.log(`Item "${piece._id}" is on sourceLayer "${piece.sourceLayerId}" that is not queueable.`)
 			return
 		}
-		if (this.props.rundown && this.props.rundown.currentPartId) {
+		if (this.props.rundown && this.props.rundown.currentPartInstanceId) {
 			if (!this.isAdLibOnAir(piece)) {
 				if (!piece.isGlobal) {
 					doUserAction(t, e, UserActionAPI.methods.segmentAdLibPieceStart, [
-						this.props.rundown._id, this.props.rundown.currentPartId, piece._id, queue || false
+						this.props.rundown._id, this.props.rundown.currentPartInstanceId, piece._id, queue || false
 					])
 				} else if (piece.isGlobal && !piece.isSticky) {
 					doUserAction(t, e, UserActionAPI.methods.baselineAdLibPieceStart, [
-						this.props.rundown._id, this.props.rundown.currentPartId, piece._id, queue || false
+						this.props.rundown._id, this.props.rundown.currentPartInstanceId, piece._id, queue || false
 					])
 				} else if (piece.isSticky) {
 					this.onToggleSticky(piece.sourceLayerId, e)
@@ -310,7 +315,7 @@ export const DashboardPanel = translateWithTracker<IAdLibPanelProps & IDashboard
 	}
 
 	onToggleSticky = (sourceLayerId: string, e: any) => {
-		if (this.props.rundown && this.props.rundown.currentPartId && this.props.rundown.active) {
+		if (this.props.rundown && this.props.rundown.currentPartInstanceId && this.props.rundown.active) {
 			const { t } = this.props
 			doUserAction(t, e, UserActionAPI.methods.sourceLayerStickyPieceStart, [this.props.rundown._id, sourceLayerId])
 		}
@@ -319,9 +324,9 @@ export const DashboardPanel = translateWithTracker<IAdLibPanelProps & IDashboard
 	onClearAllSourceLayer = (sourceLayer: ISourceLayer, e: any) => {
 		// console.log(sourceLayer)
 		const { t } = this.props
-		if (this.props.rundown && this.props.rundown.currentPartId) {
+		if (this.props.rundown && this.props.rundown.currentPartInstanceId) {
 			doUserAction(t, e, UserActionAPI.methods.sourceLayerOnPartStop, [
-				this.props.rundown._id, this.props.rundown.currentPartId, sourceLayer._id
+				this.props.rundown._id, this.props.rundown.currentPartInstanceId, sourceLayer._id
 			])
 		}
 	}

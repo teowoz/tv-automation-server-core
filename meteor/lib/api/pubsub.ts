@@ -20,6 +20,7 @@ export enum PubSub {
 	pieces = 'pieces',
 	piecesSimple = 'piecesSimple',
 	parts = 'parts',
+	partInstances = 'partInstances',
 	segments = 'segments',
 	showStyleBases = 'showStyleBases',
 	showStyleVariants = 'showStyleVariants',

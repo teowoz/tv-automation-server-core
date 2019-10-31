@@ -882,8 +882,8 @@ const RundownHeader = translate()(class extends React.Component<Translated<IRund
 			doUserAction(t, e, UserActionAPI.methods.reloadData, [this.props.rundown._id, changeRehearsal], (err, response) => {
 				if (!err && response) {
 					if (!handleRundownReloadResponse(t, this.props.rundown, response.result)) {
-						if (this.props.rundown && this.props.rundown.nextPartId) {
-							scrollToPart(this.props.rundown.nextPartId).catch(() => console.error)
+						if (this.props.rundown && this.props.rundown.nextPartInstanceId) {
+							scrollToPart(this.props.rundown.nextPartInstanceId).catch(() => console.error)
 						}
 					}
 				}
@@ -1239,6 +1239,9 @@ class extends MeteorReactComponent<Translated<IProps & ITrackedProps>, IState> {
 		this.subscribe(PubSub.parts, {
 			rundownId: rundownId
 		})
+		this.subscribe(PubSub.partInstances, {
+			rundownId: rundownId
+		})
 		this.subscribe(PubSub.pieces, {
 			rundownId: rundownId
 		})
@@ -1301,7 +1304,7 @@ class extends MeteorReactComponent<Translated<IProps & ITrackedProps>, IState> {
 
 	componentDidUpdate (prevProps: IProps & ITrackedProps, prevState: IState) {
 		if (this.props.rundown &&
-			prevProps.rundown && prevProps.rundown.currentPartId !== this.props.rundown.currentPartId &&
+			prevProps.rundown && prevProps.rundown.currentPartInstanceId !== this.props.rundown.currentPartInstanceId &&
 			this.state.manualSetAsNext) {
 
 			this.setState({
@@ -1315,22 +1318,22 @@ class extends MeteorReactComponent<Translated<IProps & ITrackedProps>, IState> {
 			})
 		} else if (this.props.rundown &&
 			prevProps.rundown && !prevProps.rundown.active && this.props.rundown.active &&
-			this.props.rundown.nextPartId) {
-			scrollToPart(this.props.rundown.nextPartId).catch(() => console.error)
+			this.props.rundown.nextPartInstanceId) {
+			scrollToPart(this.props.rundown.nextPartInstanceId).catch(() => console.error)
 		} else if (
 			// after take
 			(this.props.rundown &&
-			prevProps.rundown && this.props.rundown.currentPartId !== prevProps.rundown.currentPartId &&
-			this.props.rundown.currentPartId && this.state.followLiveSegments)
+			prevProps.rundown && this.props.rundown.currentPartInstanceId !== prevProps.rundown.currentPartInstanceId &&
+			this.props.rundown.currentPartInstanceId && this.state.followLiveSegments)
 		) {
-			scrollToPart(this.props.rundown.currentPartId, true).catch(() => console.error)
+			scrollToPart(this.props.rundown.currentPartInstanceId, true).catch(() => console.error)
 		} else if (
 			// initial Rundown open
-			(this.props.rundown && this.props.rundown.currentPartId &&
+			(this.props.rundown && this.props.rundown.currentPartInstanceId &&
 			this.state.subsReady && !prevState.subsReady)
 		) {
 			// allow for some time for the Rundown to render
-			maintainFocusOnPart(this.props.rundown.currentPartId, 7000, true, true)
+			maintainFocusOnPart(this.props.rundown.currentPartInstanceId, 7000, true, true)
 		}
 
 		if (typeof this.props.rundown !== typeof this.props.rundown ||
@@ -1377,9 +1380,9 @@ class extends MeteorReactComponent<Translated<IProps & ITrackedProps>, IState> {
 				const combos = i.hotkeys.split(',')
 				_.each(combos, (combo: string) => {
 					const handler = (e: KeyboardEvent) => {
-						if (this.props.rundown && this.props.rundown.active && this.props.rundown.nextPartId) {
+						if (this.props.rundown && this.props.rundown.active && this.props.rundown.nextPartInstanceId) {
 							doUserAction(t, e, UserActionAPI.methods.togglePartArgument, [
-								this.props.rundown._id, this.props.rundown.nextPartId, i.property, i.value
+								this.props.rundown._id, this.props.rundown.nextPartInstanceId, i.property, i.value
 							])
 						}
 					}
@@ -1496,12 +1499,12 @@ class extends MeteorReactComponent<Translated<IProps & ITrackedProps>, IState> {
 		}, { timeout: 1000 })
 	}
 	onGoToLiveSegment = () => {
-		if (this.props.rundown && this.props.rundown.active && !this.props.rundown.currentPartId &&
-			this.props.rundown.nextPartId) {
+		if (this.props.rundown && this.props.rundown.active && !this.props.rundown.currentPartInstanceId &&
+			this.props.rundown.nextPartInstanceId) {
 			this.setState({
 				followLiveSegments: true
 			})
-			scrollToPart(this.props.rundown.nextPartId, true).then(() => {
+			scrollToPart(this.props.rundown.nextPartInstanceId, true).then(() => {
 				// allow for the scroll to finish
 			}).catch((e) => {
 				console.error(e)
@@ -1512,11 +1515,11 @@ class extends MeteorReactComponent<Translated<IProps & ITrackedProps>, IState> {
 				})
 				window.dispatchEvent(new Event(RundownViewEvents.rewindsegments))
 			}, 2000)
-		} else if (this.props.rundown && this.props.rundown.active && this.props.rundown.currentPartId) {
+		} else if (this.props.rundown && this.props.rundown.active && this.props.rundown.currentPartInstanceId) {
 			this.setState({
 				followLiveSegments: true
 			})
-			scrollToPart(this.props.rundown.currentPartId, true).then(() => {
+			scrollToPart(this.props.rundown.currentPartInstanceId, true).then(() => {
 				// allow for the scroll to finish
 			}).catch((e) => {
 				console.error(e)
@@ -1561,8 +1564,8 @@ class extends MeteorReactComponent<Translated<IProps & ITrackedProps>, IState> {
 
 	onPieceDoubleClick = (item: PieceUi, e: React.MouseEvent<HTMLDivElement>) => {
 		const { t } = this.props
-		if (this.state.studioMode && item && item._id && this.props.rundown && this.props.rundown.currentPartId) {
-			doUserAction(t, e, UserActionAPI.methods.pieceTakeNow, [this.props.rundown._id, this.props.rundown.currentPartId, item._id])
+		if (this.state.studioMode && item && item._id && this.props.rundown && this.props.rundown.currentPartInstanceId) {
+			doUserAction(t, e, UserActionAPI.methods.pieceTakeNow, [this.props.rundown._id, this.props.rundown.currentPartInstanceId, item._id])
 		}
 	}
 

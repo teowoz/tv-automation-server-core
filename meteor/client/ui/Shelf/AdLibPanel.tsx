@@ -546,6 +546,9 @@ export const AdLibPanel = translateWithTracker<IAdLibPanelProps, IState, IAdLibP
 		this.subscribe(PubSub.parts, {
 			rundownId: this.props.rundown._id
 		})
+		this.subscribe(PubSub.partInstances, {
+			rundownId: this.props.rundown._id
+		})
 		this.subscribe(PubSub.adLibPieces, {
 			rundownId: this.props.rundown._id
 		})
@@ -654,14 +657,14 @@ export const AdLibPanel = translateWithTracker<IAdLibPanelProps, IState, IAdLibP
 			console.log(`Item "${piece._id}" is on sourceLayer "${piece.sourceLayerId}" that is not queueable.`)
 			return
 		}
-		if (this.props.rundown && this.props.rundown.currentPartId) {
+		if (this.props.rundown && this.props.rundown.currentPartInstanceId) {
 			if (!piece.isGlobal) {
 				doUserAction(t, e, UserActionAPI.methods.segmentAdLibPieceStart, [
-					this.props.rundown._id, this.props.rundown.currentPartId, piece._id, queue || false
+					this.props.rundown._id, this.props.rundown.currentPartInstanceId, piece._id, queue || false
 				])
 			} else if (piece.isGlobal && !piece.isSticky) {
 				doUserAction(t, e, UserActionAPI.methods.baselineAdLibPieceStart, [
-					this.props.rundown._id, this.props.rundown.currentPartId, piece._id, queue || false
+					this.props.rundown._id, this.props.rundown.currentPartInstanceId, piece._id, queue || false
 				])
 			} else if (piece.isSticky) {
 				doUserAction(t, e, UserActionAPI.methods.sourceLayerStickyPieceStart, [
@@ -674,9 +677,9 @@ export const AdLibPanel = translateWithTracker<IAdLibPanelProps, IState, IAdLibP
 	onClearAllSourceLayer = (sourceLayer: ISourceLayer, e: any) => {
 		// console.log(sourceLayer)
 		const { t } = this.props
-		if (this.props.rundown && this.props.rundown.currentPartId) {
+		if (this.props.rundown && this.props.rundown.currentPartInstanceId) {
 			doUserAction(t, e, UserActionAPI.methods.sourceLayerOnPartStop, [
-				this.props.rundown._id, this.props.rundown.currentPartId, sourceLayer._id
+				this.props.rundown._id, this.props.rundown.currentPartInstanceId, sourceLayer._id
 			])
 		}
 	}

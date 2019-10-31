@@ -12,7 +12,7 @@ import { Segment } from './collections/Segments'
 import { Part, Parts } from './collections/Parts'
 import { Rundown } from './collections/Rundowns'
 import { ShowStyleBase } from './collections/ShowStyleBases'
-import { interpretExpression } from 'superfly-timeline/dist/resolver/expression'
+import { PartInstance, FindInstanceOrWrapToTemporary, PartInstances, WrapPartToTemporaryInstance } from './collections/PartInstances'
 
 export const DEFAULT_DISPLAY_DURATION = 3000
 
@@ -27,7 +27,7 @@ export interface SegmentExtended extends Segment {
 	}
 }
 
-export interface PartExtended extends Part {
+export interface PartInstanceExtended extends PartInstance {
 	/** Pieces belonging to this part */
 	pieces: Array<PieceExtended>
 	renderedDuration: number
@@ -86,13 +86,13 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 	/** A Segment with some additional information */
 	segmentExtended: SegmentExtended,
 	/** Parts in the segment, with additional information on the Part and the Pieces */
-	parts: Array<PartExtended>,
+	parts: Array<PartInstanceExtended>,
 	/** A flag if the segment is currently on air (one of it's Parts is on air) */
 	isLiveSegment: boolean,
 	/** A flag if the segment is currently next (one of it's Parts is on air) */
 	isNextSegment: boolean,
 	/** The part that is currently on air, if the Segment is on air */
-	currentLivePart: PartExtended | undefined,
+	currentLivePart: PartInstanceExtended | undefined,
 	/** A flag if any of the Parts have a Piece on a Layer with the 'Remote' flag on */
 	hasRemoteItems: boolean,
 	/** A flag if any of the Parts have a Piece on a Layer with the 'Guest' flag on */
@@ -102,16 +102,16 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 	/** A flag if the current on air part (doesn't have to be of this segment) will autonext */
 	autoNextPart: boolean
 	/** If checkFollowingPart is true, it will return the part that will follow this segment */
-	followingPart: PartExtended | undefined
+	followingPart: PartInstanceExtended | undefined
 } {
 	let isLiveSegment = false
 	let isNextSegment = false
-	let currentLivePart: PartExtended | undefined = undefined
-	// let nextPart: PartExtended | undefined = undefined
+	let currentLivePart: PartInstanceExtended | undefined = undefined
+	// let nextPart: PartInstanceExtended | undefined = undefined
 	let hasAlreadyPlayed = false
 	let hasRemoteItems = false
 	let hasGuestItems = false
-	let followingPart: PartExtended | undefined
+	let followingPart: PartInstanceExtended | undefined
 
 	let autoNextPart = false
 
@@ -121,25 +121,32 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 	segmentExtended.sourceLayers = {}
 
 	// fetch all the parts for the segment
-	let partsE: Array<PartExtended> = []
-	const parts = segment.getParts()
+	let partsE: Array<PartInstanceExtended> = []
+	const rawPartInstances = segment.getPartInstances()
+	const parts = _.map(segment.getParts(), part => FindInstanceOrWrapToTemporary(rawPartInstances, part))
 
 	if (parts.length > 0) {
 		if (checkFollowingSegment) {
-			let followingParts = Parts.find({
+			let rawFollowingPart = Parts.findOne({
 				rundownId: segment.rundownId,
 				_rank: {
 					$gt: parts[parts.length - 1]._rank
 				}
-			}, { sort: { _rank: 1 }, limit: 1 }).fetch()
-			if (followingParts.length > 0) {
-				let firstFollowingPart = followingParts[0]
+			}, { sort: { _rank: 1 } })
+			if (rawFollowingPart) {
+				let firstFollowingPart = (rawFollowingPart ? PartInstances.findOne({
+					rundownId: segment.rundownId,
+					partId: rawFollowingPart._id,
+					reset: { $ne: true }
+				}, {
+					sort: {} // TODO?
+				}) : undefined) || WrapPartToTemporaryInstance(rawFollowingPart)
 
 				let pieces = Pieces.find({
-					partId: firstFollowingPart._id
+					partId: firstFollowingPart.partId
 				}).fetch()
 
-				followingPart = extendMandadory<Part, PartExtended>(firstFollowingPart, {
+				followingPart = extendMandadory<PartInstance, PartInstanceExtended>(firstFollowingPart, {
 					pieces: _.map(pieces, (piece) => {
 						return extendMandadory<Piece, PieceExtended>(piece, {
 							// sourceLayer: ISourceLayerExtended,
@@ -194,14 +201,14 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 		const displayDurationGroups: _.Dictionary<number> = {}
 
 		let startsAt = 0
-		let previousPart: PartExtended
+		let previousPart: PartInstanceExtended
 		// fetch all the pieces for the parts
 		partsE = _.map(parts, (part, itIndex) => {
 			let partTimeline: SuperTimeline.TimelineObject[] = []
 
 			// extend objects to match the Extended interface
-			let partE: PartExtended = extendMandadory(part, {
-				pieces: _.map(Pieces.find({ partId: part._id }).fetch(), (piece) => {
+			let partE: PartInstanceExtended = extendMandadory(part, {
+				pieces: _.map(Pieces.find({ partId: part.partId }).fetch(), (piece) => {
 					return extendMandadory<Piece, PieceExtended>(piece, {
 						renderedDuration: 0,
 						renderedInPoint: 0
@@ -217,11 +224,11 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 			})
 
 			// set the flags for isLiveSegment, isNextSegment, autoNextPart, hasAlreadyPlayed
-			if (rundown.currentPartId === partE._id) {
+			if (rundown.currentPartInstanceId === partE._id) {
 				isLiveSegment = true
 				currentLivePart = partE
 			}
-			if (rundown.nextPartId === partE._id) {
+			if (rundown.nextPartInstanceId === partE._id) {
 				isNextSegment = true
 			}
 			autoNextPart = !!(
@@ -236,7 +243,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 					false
 				)
 			)
-			if (partE.startedPlayback !== undefined) {
+			if (partE.timings.startedPlayback !== undefined) {
 				hasAlreadyPlayed = true
 			}
 
@@ -362,7 +369,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 			return (item.playoutDuration || userDurationNumber || item.renderedDuration || expectedDurationNumber)
 		}
 
-		_.each<PartExtended>(partsE, (part) => {
+		_.each<PartInstanceExtended>(partsE, (part) => {
 			if (part.pieces) {
 				// if an item is continued by another item, rendered duration may need additional resolution
 				_.each<PieceExtended>(part.pieces, (item) => {
@@ -442,8 +449,8 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 		segmentExtended.outputLayers = outputLayers
 		segmentExtended.sourceLayers = sourceLayers
 
-		if (isNextSegment && !isLiveSegment && !autoNextPart && rundown.currentPartId) {
-			const currentOtherPart = Parts.findOne(rundown.currentPartId)
+		if (isNextSegment && !isLiveSegment && !autoNextPart && rundown.currentPartInstanceId) {
+			const currentOtherPart = PartInstances.findOne(rundown.currentPartInstanceId)
 			if (currentOtherPart && currentOtherPart.expectedDuration && currentOtherPart.autoNext) {
 				autoNextPart = true
 			}

@@ -56,7 +56,7 @@ export class PrompterViewInner extends MeteorReactComponent<Translated<IProps & 
 	scrollSpeed: number = window.innerHeight * 2 // px per second
 	scrollSpeedMultiplier: number = 1
 
-	autoScrollPreviousPartId: string | null = null
+	autoScrollPreviousPartInstanceId: string | null = null
 
 	scrollDirection2: number = 0
 
@@ -126,8 +126,8 @@ export class PrompterViewInner extends MeteorReactComponent<Translated<IProps & 
 		if (this.configOptions.followTake) {
 			if (rundown) {
 
-				if (rundown.currentPartId !== this.autoScrollPreviousPartId) {
-					this.autoScrollPreviousPartId = rundown.currentPartId
+				if (rundown.currentPartInstanceId !== this.autoScrollPreviousPartInstanceId) {
+					this.autoScrollPreviousPartInstanceId = rundown.currentPartInstanceId
 
 					this.scrollToCurrent()
 				}
@@ -204,11 +204,11 @@ export class PrompterViewInner extends MeteorReactComponent<Translated<IProps & 
 				const current = anchors[index]
 				const next = index + 1 < anchors.length ? anchors[index + 1] : null
 
-				if (rundown.currentPartId && current.classList.contains(`part-${rundown.currentPartId}`)) {
+				if (rundown.currentPartInstanceId && current.classList.contains(`part-${rundown.currentPartInstanceId}`)) {
 					currentPartElement = current
 					currentPartElementAfter = next
 				}
-				if (rundown.nextPartId && current.classList.contains(`part-${rundown.nextPartId}`)) {
+				if (rundown.nextPartInstanceId && current.classList.contains(`part-${rundown.nextPartInstanceId}`)) {
 					nextPartElementAfter = next
 				}
 			}
@@ -333,8 +333,8 @@ interface IPrompterProps {
 }
 interface IPrompterTrackedProps {
 	rundown: Rundown | undefined,
-	currentPartId: string,
-	nextPartId: string,
+	currentPartInstanceId: string,
+	nextPartInstanceId: string,
 	prompterData: PrompterData
 }
 interface IPrompterState {
@@ -348,8 +348,8 @@ export const Prompter = translateWithTracker<IPrompterProps, {}, IPrompterTracke
 
 	return {
 		rundown: rundown,
-		currentPartId: rundown && rundown.currentPartId || '',
-		nextPartId: rundown && rundown.nextPartId || '',
+		currentPartInstanceId: rundown && rundown.currentPartInstanceId || '',
+		nextPartInstanceId: rundown && rundown.nextPartInstanceId || '',
 		prompterData
 	}
 })(class Prompter extends MeteorReactComponent<Translated<IPrompterProps & IPrompterTrackedProps>, IPrompterState> {
@@ -368,6 +368,7 @@ export const Prompter = translateWithTracker<IPrompterProps, {}, IPrompterTracke
 		this.subscribe(PubSub.rundowns, { _id: this.props.rundownId })
 		this.subscribe(PubSub.segments, { rundownId: this.props.rundownId })
 		this.subscribe(PubSub.parts, { rundownId: this.props.rundownId })
+		this.subscribe(PubSub.partInstances, { rundownId: this.props.rundownId })
 		this.subscribe(PubSub.pieces, { rundownId: this.props.rundownId })
 
 	}

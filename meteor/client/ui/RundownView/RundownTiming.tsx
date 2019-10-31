@@ -8,6 +8,7 @@ import { Part, Parts } from '../../../lib/collections/Parts'
 import { getCurrentTime, literal } from '../../../lib/lib'
 import { RundownUtils } from '../../lib/rundown'
 import { MeteorReactComponent } from '../../lib/MeteorReactComponent'
+import { PartInstance, PartInstances, WrapPartToTemporaryInstance } from '../../../lib/collections/PartInstances'
 
 export interface TimeEventArgs {
 	currentTime: number
@@ -119,6 +120,7 @@ interface IRundownTimingProviderState {
 }
 interface IRundownTimingProviderTrackedProps {
 	parts: Array<Part>
+	partInstances: Array<PartInstance>
 }
 
 /**
@@ -131,6 +133,7 @@ export const RundownTimingProvider =
 withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTimingProviderTrackedProps>(
 (props) => {
 	let parts: Array<Part> = []
+	let partInstances: Array<PartInstance> = []
 	if (props.rundown) {
 		parts = Parts.find({
 			'rundownId': props.rundown._id,
@@ -139,9 +142,17 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 				'_rank': 1
 			}
 		}).fetch()
+		partInstances = PartInstances.find({
+			'rundownId': props.rundown._id,
+		}, {
+			sort: {
+				'_rank': 1
+			}
+		}).fetch()
 	}
 	return {
-		parts
+		parts,
+		partInstances
 	}
 })(class RundownTimingProvider extends MeteorReactComponent<
 	IRundownTimingProviderProps & IRundownTimingProviderTrackedProps, IRundownTimingProviderState
@@ -258,33 +269,33 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 
 		let debugConsole = ''
 
-		const { rundown, parts } = this.props
+		const { rundown, parts, partInstances } = this.props
 
 		let nextAIndex = -1
 		let currentAIndex = -1
 
 		if (rundown && parts) {
-			parts.forEach((part, itIndex) => {
+			parts.forEach((rawPart, itIndex) => {
 				// add piece to accumulator
-				const aIndex = this.linearParts.push([part._id, waitAccumulator]) - 1
+				const part = _.find(partInstances, instance => instance.partId === rawPart._id) || WrapPartToTemporaryInstance(rawPart)
+				const aIndex = this.linearParts.push([part.partId, waitAccumulator]) - 1
 
 				// if this is next segementLine, clear previous countdowns and clear accumulator
-				if (rundown.nextPartId === part._id) {
+				if (rundown.nextPartInstanceId === part._id) {
 					nextAIndex = aIndex
-				} else if (rundown.currentPartId === part._id) {
+				} else if (rundown.currentPartInstanceId === part._id) {
 					currentAIndex = aIndex
 				}
 
 				// expected is just a sum of expectedDurations
 				totalRundownDuration += part.expectedDuration || 0
 
-				const lastStartedPlayback = part.getLastStartedPlayback()
-				const playOffset = part.timings && part.timings.playOffset && _.last(part.timings.playOffset) || 0
+				const lastStartedPlayback = part.timings.startedPlayback
+				const playOffset = part.timings.playOffset || 0
 
 				// asPlayed is the actual duration so far and expected durations in unplayed lines
 				// item is onAir right now, and it's already taking longer than rendered/expectedDuration
 				if (
-					part.startedPlayback &&
 					lastStartedPlayback &&
 					!part.duration &&
 					lastStartedPlayback + (part.expectedDuration || 0) < now
@@ -320,7 +331,7 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 						|| Math.max(0, this.displayDurationGroups[part.displayDurationGroup], this.props.defaultDuration || DEFAULT_DURATION)
 					memberOfDisplayDurationGroup = true
 				}
-				if (part.startedPlayback && lastStartedPlayback && !part.duration) {
+				if (lastStartedPlayback && !part.duration) {
 					currentRemaining = Math.max(0, (part.duration ||
 						(memberOfDisplayDurationGroup ?
 							displayDurationFromGroup :
@@ -375,14 +386,13 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 				}
 
 				// remaining is the sum of unplayed lines + whatever is left of the current segment
-				if (!part.startedPlayback) {
+				if (!lastStartedPlayback) {
 					remainingRundownDuration += part.expectedDuration || 0
 					// item is onAir right now, and it's is currently shorter than expectedDuration
 				} else if (
-					part.startedPlayback &&
 					lastStartedPlayback &&
 					!part.duration &&
-					rundown.currentPartId === part._id &&
+					rundown.currentPartInstanceId === part._id &&
 					lastStartedPlayback + (part.expectedDuration || 0) > now
 				) {
 					// console.log((now - item.startedPlayback))
@@ -421,7 +431,7 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 			totalRundownDuration,
 			remainingRundownDuration,
 			asPlayedRundownDuration,
-			partCountdown: _.object(this.linearParts),
+			partCountdown: _.object(this.linearParts), // TODO - these are NOT instance ids
 			partDurations: this.partDurations,
 			partPlayed: this.partPlayed,
 			partStartsAt: this.partStartsAt,

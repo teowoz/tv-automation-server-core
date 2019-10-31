@@ -1,16 +1,34 @@
 import { RundownAPI } from '../api/rundown'
 import { TimelineTransition, Timeline } from 'timeline-state-resolver-types'
 import { TransformedCollection } from '../typings/meteor'
-import { PartTimings } from './Parts'
 import { registerCollection } from '../lib'
 import { Meteor } from 'meteor/meteor'
 import {
 	IBlueprintPieceGeneric,
-	IBlueprintPieceDB,
+	IBlueprintPieceInstance,
 	PieceLifespan,
 	BaseContent,
+	Time,
 } from 'tv-automation-sofie-blueprints-integration'
 import { createMongoCollection } from './lib'
+
+export interface TmpTimings {
+	/** Point in time the Part was taken, (ie the time of the user action) */
+	take: Time[]
+	/** Point in time the "take" action has finished executing */
+	takeDone: Time[]
+	/** Point in time the Part started playing (ie the time of the playout) */
+	startedPlayback: Time[]
+	/** Point in time the Part stopped playing (ie the time of the user action) */
+	takeOut: Time[]
+	/** Point in time the Part stopped playing (ie the time of the playout) */
+	stoppedPlayback: Time[]
+	/** Point in time the Part was set as Next (ie the time of the user action) */
+	next: Time[]
+
+	/** The playback offset that was set for the last take */
+	playOffset: Array<Time>
+}
 
 /** A Single item in a "line": script, VT, cameras */
 export interface PieceGeneric extends IBlueprintPieceGeneric {
@@ -45,7 +63,7 @@ export interface PieceGeneric extends IBlueprintPieceGeneric {
 	/** The time the system started playback of this part, null if not yet played back (milliseconds since epoch) */
 	startedPlayback?: number
 	/** Playout timings, in here we log times when playout happens */
-	timings?: PartTimings
+	timings?: TmpTimings
 	/** Actual duration of the piece, as played-back, in milliseconds. This value will be updated during playback for some types of pieces. */
 	playoutDuration?: number
 
@@ -53,7 +71,7 @@ export interface PieceGeneric extends IBlueprintPieceGeneric {
 	extendOnHold?: boolean
 }
 
-export interface Piece extends PieceGeneric, IBlueprintPieceDB {
+export interface Piece extends PieceGeneric, IBlueprintPieceInstance {
 	// -----------------------------------------------------------------------
 
 	partId: string

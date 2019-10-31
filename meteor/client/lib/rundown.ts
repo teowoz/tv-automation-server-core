@@ -115,13 +115,13 @@ export namespace RundownUtils {
 					(piece !== undefined ?
 						(piece.renderedInPoint || 0) + (piece.renderedDuration || (
 							(part.duration !== undefined ?
-								(part.duration + (part.getLastPlayOffset() || 0)) :
+								(part.duration + (part.timings.playOffset || 0)) :
 								(partDuration || part.renderedDuration || part.expectedDuration || 0)
 									- (piece.renderedInPoint || 0))
 							)
 						) :
 						(part.duration !== undefined ?
-							(part.duration + (part.getLastPlayOffset() || 0)) :
+							(part.duration + (part.timings.playOffset || 0)) :
 							(partDuration || part.renderedDuration || 0)
 						)
 					)

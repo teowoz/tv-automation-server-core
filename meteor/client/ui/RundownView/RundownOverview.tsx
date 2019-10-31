@@ -11,11 +11,12 @@ import { withTiming, WithTiming } from './RundownTiming'
 import { ErrorBoundary } from '../../lib/ErrorBoundary'
 import { MeteorReactComponent } from '../../lib/MeteorReactComponent'
 import { RundownUtils } from '../../lib/rundown'
-import { PartExtended } from '../../../lib/Rundown'
 import { Part } from '../../../lib/collections/Parts'
+import { PartInstanceExtended } from '../../../lib/Rundown'
+import { FindInstanceOrWrapToTemporary, PartInstance } from '../../../lib/collections/PartInstances'
 
 interface SegmentUi extends Segment {
-	items: Array<PartUi>
+	partInstances: Array<PartUi>
 }
 
 interface ISegmentPropsHeader {
@@ -47,7 +48,7 @@ const PartOverview: React.SFC<IPartPropsHeader> = (props: IPartPropsHeader) => {
 				'live': props.isLive,
 				'next': props.isNext,
 
-				'has-played': (props.part.startedPlayback && (props.part.getLastStartedPlayback() || 0) > 0 && (props.part.duration || 0) > 0)
+				'has-played': (props.part.timings.startedPlayback !== undefined && props.part.timings.startedPlayback > 0 && (props.part.duration || 0) > 0)
 			})}
 				style={{
 					'width': (((Math.max(props.segmentLiveDurations && props.segmentLiveDurations[props.part._id] || 0, props.part.duration || props.part.expectedDuration || 0)) / (props.segmentDuration || 0)) * 100) + '%'
@@ -60,7 +61,7 @@ const PartOverview: React.SFC<IPartPropsHeader> = (props: IPartPropsHeader) => {
 				{ props.isLive &&
 					<div className='rundown__overview__segment__part__live-line'
 						style={{
-							'left': (((getCurrentTime() - (props.part.getLastStartedPlayback() || 0)) /
+							'left': (((getCurrentTime() - (props.part.timings.startedPlayback || 0)) /
 								(Math.max(props.segmentLiveDurations && props.segmentLiveDurations[props.part._id] || 0, props.part.duration || props.part.expectedDuration || 0))) * 100) + '%'
 						}}>
 					</div>
@@ -71,24 +72,24 @@ const PartOverview: React.SFC<IPartPropsHeader> = (props: IPartPropsHeader) => {
 }
 
 const SegmentOverview: React.SFC<ISegmentPropsHeader> = (props: ISegmentPropsHeader) => {
-	const segmentDuration = props.segmentLiveDurations ? props.segment.items.map((i) => props.segmentLiveDurations[i._id]).reduce((memo, item) => (memo || 0) + (item || 0), 0) : undefined
+	const segmentDuration = props.segmentLiveDurations ? props.segment.partInstances.map((i) => props.segmentLiveDurations[i._id]).reduce((memo, item) => (memo || 0) + (item || 0), 0) : undefined
 
-	return props.segment.items && (
+	return props.segment.partInstances && (
 		<div className={ClassNames('rundown__overview__segment', {
-			'next': props.segment.items.find((i) => i._id === props.rundown.nextPartId) ? true : false,
-			'live': props.segment.items.find((i) => i._id === props.rundown.currentPartId) ? true : false
+			'next': props.segment.partInstances.find((i) => i._id === props.rundown.nextPartInstanceId) ? true : false,
+			'live': props.segment.partInstances.find((i) => i._id === props.rundown.currentPartInstanceId) ? true : false
 		})} style={{
 			'width': ((segmentDuration || 0) / props.totalDuration * 100) + '%'
 		}}>
-			{ props.segment.items.map((item, index) => {
+			{ props.segment.partInstances.map((item, index) => {
 				return (
 					<PartOverview part={item}
 						key={item._id}
 						totalDuration={props.totalDuration}
 						segmentLiveDurations={props.segmentLiveDurations}
 						segmentStartsAt={props.segmentStartsAt}
-						isLive={props.rundown.currentPartId === item._id}
-						isNext={props.rundown.nextPartId === item._id}
+						isLive={props.rundown.currentPartInstanceId === item._id}
+						isNext={props.rundown.nextPartInstanceId === item._id}
 						segmentDuration={segmentDuration}
 						 />
 				)
@@ -126,16 +127,18 @@ withTracker<WithTiming<RundownOverviewProps>, RundownOverviewState, RundownOverv
 	let segments: Array<SegmentUi> = []
 	if (rundown) {
 		segments = _.map(rundown.getSegments(), (segment) => {
+			const partInstances = segment.getPartInstances()
 			return extendMandadory<Segment, SegmentUi>(segment, {
-				items: _.map(segment.getParts(), (part) => {
-					let sle = extendMandadory<Part, PartExtended>(part, {
+				partInstances: _.map(segment.getParts(), (part) => {
+					const instance = FindInstanceOrWrapToTemporary(partInstances, part)
+					let sle = extendMandadory<PartInstance, PartInstanceExtended>(instance, {
 						pieces: [],
 						renderedDuration: 0,
 						startsAt: 0,
 						willProbablyAutoNext: false
 					})
 
-					return extendMandadory<PartExtended, PartUi>(sle, {})
+					return extendMandadory<PartInstanceExtended, PartUi>(sle, {})
 				})
 			})
 		})

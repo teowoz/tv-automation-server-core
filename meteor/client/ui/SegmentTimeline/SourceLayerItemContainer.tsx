@@ -13,7 +13,6 @@ import { checkPieceContentStatus } from '../../../lib/mediaObjects'
 import {
 	ISourceLayerUi,
 	IOutputLayerUi,
-	SegmentUi,
 	PartUi,
 	PieceUi
 } from './SegmentTimelineContainer'
@@ -110,8 +109,8 @@ export const SourceLayerItemContainer = class extends MeteorReactComponent<IProp
 					if (_.isNumber(timelineObj.enable.start)) { // this is a normal absolute trigger value
 						pieceCopy.renderedInPoint = timelineObj.enable.start
 					} else if (timelineObj.enable.start === 'now') { // this is a special absolute trigger value
-						if (props.part && props.part.startedPlayback && props.part.getLastStartedPlayback()) {
-							pieceCopy.renderedInPoint = getCurrentTime() - (props.part.getLastStartedPlayback() || 0)
+						if (props.part && props.part.timings.startedPlayback) {
+							pieceCopy.renderedInPoint = getCurrentTime() - props.part.timings.startedPlayback
 						} else {
 							pieceCopy.renderedInPoint = 0
 						}

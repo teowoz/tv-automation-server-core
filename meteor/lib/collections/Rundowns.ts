@@ -56,15 +56,15 @@ export interface DBRundown extends IBlueprintRundownDB {
 	/** Whether the rundown is active in rehearsal or not */
 	rehearsal?: boolean
 	/** the id of the Live Part - if empty, no part in this rundown is live */
-	currentPartId: string | null
+	currentPartInstanceId: string | null
 	/** the id of the Next Part - if empty, no segment will follow Live Part */
-	nextPartId: string | null
+	nextPartInstanceId: string | null
 	/** The time offset of the next line */
 	nextTimeOffset?: number | null
 	/** if nextPartId was set manually (ie from a user action) */
 	nextPartManual?: boolean
 	/** the id of the Previous Part */
-	previousPartId: string | null
+	previousPartInstanceId: string | null
 
 	/** Actual time of playback starting */
 	startedPlayback?: Time
@@ -110,11 +110,11 @@ export class Rundown implements DBRundown {
 	public airStatus?: string
 	public active?: boolean
 	public rehearsal?: boolean
-	public currentPartId: string | null
-	public nextPartId: string | null
+	public currentPartInstanceId: string | null
+	public nextPartInstanceId: string | null
 	public nextTimeOffset?: number | null
 	public nextPartManual?: boolean
-	public previousPartId: string | null
+	public previousPartInstanceId: string | null
 	public startedPlayback?: Time
 	public unsynced?: boolean
 	public unsyncedTime?: Time
@@ -192,26 +192,26 @@ export class Rundown implements DBRundown {
 			Rundowns.update(this._id, { $set: { modified: getCurrentTime() } })
 		}
 	}
-	getTimings () {
-		let timings: Array<{
-			time: Time,
-			type: string,
-			part: string,
-			elapsed: Time
-		}> = []
-		_.each(this.getParts(), (part: Part) => {
-			_.each(part.getTimings(), (t) => {
+	// getTimings () {
+	// 	let timings: Array<{
+	// 		time: Time,
+	// 		type: string,
+	// 		part: string,
+	// 		elapsed: Time
+	// 	}> = []
+	// 	_.each(this.getParts(), (part: Part) => {
+	// 		_.each(part.getTimings(), (t) => {
 
-				timings.push({
-					time: t.time,
-					elapsed: t.elapsed,
-					type: t.type,
-					part: part._id
-				})
-			})
-		})
-		return timings
-	}
+	// 			timings.push({
+	// 				time: t.time,
+	// 				elapsed: t.elapsed,
+	// 				type: t.type,
+	// 				part: part._id
+	// 			})
+	// 		})
+	// 	})
+	// 	return timings
+	// }
 	fetchAllData (): RundownData {
 
 		// Do fetches in parallell:

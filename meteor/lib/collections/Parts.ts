@@ -4,22 +4,23 @@ import { Rundowns } from './Rundowns'
 import { Piece, Pieces } from './Pieces'
 import { AdLibPieces } from './AdLibPieces'
 import { Segments } from './Segments'
-import { applyClassToDocument, Time, registerCollection, normalizeArray } from '../lib'
+import { applyClassToDocument, registerCollection, normalizeArray } from '../lib'
 import { RundownAPI } from '../api/rundown'
 import { checkPieceContentStatus } from '../mediaObjects'
 import { Meteor } from 'meteor/meteor'
 import {
-	IBlueprintPartDB,
+	IBlueprintPart,
 	PartHoldMode,
-	BlueprintRuntimeArguments,
-	IBlueprintPartDBTimings,
-	PartEndState,
 } from 'tv-automation-sofie-blueprints-integration'
 import { PartNote, NoteType } from '../api/notes'
 import { createMongoCollection } from './lib'
 
 /** A "Line" in NRK Lingo. */
-export interface DBPart extends IBlueprintPartDB {
+export interface DBPart extends IBlueprintPart {
+	_id: string
+	/** The segment ("Title") this line belongs to */
+	segmentId: string
+
 	/** Position inside the segment */
 	_rank: number
 
@@ -28,38 +29,8 @@ export interface DBPart extends IBlueprintPartDB {
 
 	status?: string
 
-	/** Whether the part has started playback (the most recent time it was played).
-	 * This is reset each time setAsNext is used.
-	 * This is set from a callback from the playout gateway
-	 */
-	startedPlayback?: boolean
-	/** Whether the part has stopped playback (the most recent time it was played & stopped).
-	 * This is set from a callback from the playout gateway
-	 */
-	stoppedPlayback?: boolean
-
-	/** The time the system played back this part, null if not yet finished playing, in milliseconds.
-	 * This is set when Take:ing the next part
-	 */
-	duration?: number
-	/** The end state of the previous part, to allow for bits of this to part to be based on what the previous did/was */
-	previousPartEndState?: PartEndState
-
 	/** Holds notes (warnings / errors) thrown by the blueprints during creation */
 	notes?: Array<PartNote>
-	/** if the part is inserted after another (for adlibbing) */
-	afterPart?: string
-	/** if the part was dunamically inserted (adlib) */
-	dynamicallyInserted?: boolean
-
-	/** Runtime blueprint arguments allows Sofie-side data to be injected into the blueprint for an part */
-	runtimeArguments?: BlueprintRuntimeArguments
-	/** An part should be marked as `dirty` if the part blueprint has been injected with runtimeArguments */
-	dirty?: boolean
-}
-export interface PartTimings extends IBlueprintPartDBTimings {
-	/** The playback offset that was set for the last take */
-	playOffset: Array<Time>
 }
 
 export class Part implements DBPart {
@@ -87,23 +58,13 @@ export class Part implements DBPart {
 	public displayDurationGroup?: string
 	public displayDuration?: number
 	public invalid?: boolean
-	// From IBlueprintPartDB:
+	// From DBPart:
 	public _id: string
 	public segmentId: string
-	public timings?: PartTimings
-	// From DBPart:
 	public _rank: number
 	public rundownId: string
 	public status?: string
-	public startedPlayback?: boolean
-	public stoppedPlayback?: boolean
-	public duration?: number
-	public previousPartEndState?: PartEndState
 	public notes?: Array<PartNote>
-	public afterPart?: string
-	public dynamicallyInserted?: boolean
-	public runtimeArguments?: BlueprintRuntimeArguments
-	public dirty?: boolean
 
 	constructor (document: DBPart) {
 		_.each(_.keys(document), (key) => {
@@ -146,33 +107,6 @@ export class Part implements DBPart {
 			}, options)
 		).fetch()
 	}
-	getTimings () {
-		// return a chronological list of timing events
-		let events: Array<{time: Time, type: string, elapsed: Time}> = []
-		_.each(['take', 'takeDone', 'startedPlayback', 'takeOut', 'stoppedPlayback', 'next'], (key) => {
-			if (this.timings) {
-				_.each(this.timings[key], (t: Time) => {
-					events.push({
-						time: t,
-						type: key,
-						elapsed: 0
-					})
-				})
-			}
-		})
-		let prevEv: any = null
-		return _.map(
-			_.sortBy(events, e => e.time),
-			(ev) => {
-				if (prevEv) {
-					ev.elapsed = ev.time - prevEv.time
-				}
-				prevEv = ev
-				return ev
-			}
-		)
-
-	}
 	getNotes (runtimeNotes?: boolean): Array<PartNote> {
 		let notes: Array<PartNote> = []
 		notes = notes.concat(this.notes || [])
@@ -206,27 +140,6 @@ export class Part implements DBPart {
 			})
 		}
 		return notes
-	}
-	getLastTake () {
-		if (!this.timings) return undefined
-
-		if (!this.timings.take || this.timings.take.length === 0) return undefined
-
-		return this.timings.take[this.timings.take.length - 1]
-	}
-	getLastStartedPlayback () {
-		if (!this.timings) return undefined
-
-		if (!this.timings.startedPlayback || this.timings.startedPlayback.length === 0) return undefined
-
-		return this.timings.startedPlayback[this.timings.startedPlayback.length - 1]
-	}
-	getLastPlayOffset () {
-		if (!this.timings) return undefined
-
-		if (!this.timings.playOffset || this.timings.playOffset.length === 0) return undefined
-
-		return this.timings.playOffset[this.timings.playOffset.length - 1]
 	}
 }
 
