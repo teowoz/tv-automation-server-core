@@ -3,17 +3,17 @@ import * as _ from 'underscore'
 import { IConfigItem } from 'tv-automation-sofie-blueprints-integration'
 import { logger } from '../../logging'
 import { Rundown, Rundowns, RundownHoldState } from '../../../lib/collections/Rundowns'
-import { Parts } from '../../../lib/collections/Parts'
 import { Studio } from '../../../lib/collections/Studios'
 import { PeripheralDevices, PeripheralDevice } from '../../../lib/collections/PeripheralDevices'
 import { PeripheralDeviceAPI } from '../../../lib/api/peripheralDevice'
-import { getCurrentTime } from '../../../lib/lib'
+import { getCurrentTime, literal } from '../../../lib/lib'
 import { getBlueprintOfRundown } from '../blueprints/cache'
 import { RundownContext } from '../blueprints/context'
 import { setNextPart, onPartHasStoppedPlaying } from './lib'
 import { updateTimeline } from './timeline'
 import { IngestActions } from '../ingest/actions'
 import { areThereActiveRundownsInStudio } from './studio'
+import { PartInstances } from '../../../lib/collections/PartInstances'
 
 export function activateRundown (rundown: Rundown, rehearsal: boolean) {
 	logger.info('Activating rundown ' + rundown._id + (rehearsal ? ' (Rehearsal)' : ''))
@@ -46,7 +46,7 @@ export function activateRundown (rundown: Rundown, rehearsal: boolean) {
 	rundown.active = true
 	rundown.rehearsal = rehearsal
 
-	if (!rundown.nextPartId) {
+	if (!rundown.nextPartInstanceId) {
 		let parts = rundown.getParts()
 		let firstPart = _.first(parts)
 		if (firstPart && !firstPart.invalid) {
@@ -81,26 +81,27 @@ export function deactivateRundown (rundown: Rundown) {
 export function deactivateRundownInner (rundown: Rundown) {
 	logger.info('Deactivating rundown ' + rundown._id)
 
-	const previousPart = (rundown.currentPartId ?
-		Parts.findOne(rundown.currentPartId)
+	const previousPart = (rundown.currentPartInstanceId ?
+		PartInstances.findOne(rundown.currentPartInstanceId)
 		: null
 	)
 
 	if (previousPart) onPartHasStoppedPlaying(previousPart, getCurrentTime())
 
 	Rundowns.update(rundown._id, {
-		$set: {
+		$set: literal<Partial<Rundown>>({
 			active: false,
-			previousPartId: null,
-			currentPartId: null,
+			previousPartInstanceId: null,
+			currentPartInstanceId: null,
+			nextPartInstanceId: null,
 			holdState: RundownHoldState.NONE,
-		}
+		})
 	})
 	setNextPart(rundown, null)
 
-	if (rundown.currentPartId) {
-		Parts.update(rundown.currentPartId, {
-			$push: {
+	if (rundown.currentPartInstanceId) {
+		PartInstances.update(rundown.currentPartInstanceId, {
+			$set: {
 				'timings.takeOut': getCurrentTime()
 			}
 		})

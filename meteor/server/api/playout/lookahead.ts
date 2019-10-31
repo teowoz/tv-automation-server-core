@@ -1,7 +1,7 @@
 import { Meteor } from 'meteor/meteor'
 import * as _ from 'underscore'
 import { LookaheadMode, Timeline as TimelineTypes, OnGenerateTimelineObj } from 'tv-automation-sofie-blueprints-integration'
-import { RundownData, Rundown } from '../../../lib/collections/Rundowns'
+import { PlayoutRundownData, Rundown } from '../../../lib/collections/Rundowns'
 import { Studio, MappingExt } from '../../../lib/collections/Studios'
 import { TimelineObjGeneric, TimelineObjRundown, fixTimelineId, TimelineObjType } from '../../../lib/collections/Timeline'
 import { Part } from '../../../lib/collections/Parts'
@@ -11,7 +11,7 @@ import { clone, literal } from '../../../lib/lib'
 
 const LOOKAHEAD_OBJ_PRIORITY = 0.1
 
-export function getLookeaheadObjects (rundownData: RundownData, studio: Studio): Array<TimelineObjGeneric> {
+export function getLookeaheadObjects (rundownData: PlayoutRundownData, studio: Studio): Array<TimelineObjGeneric> {
 	const activeRundown = rundownData.rundown
 	const currentPart = activeRundown.currentPartId ? rundownData.partsMap[activeRundown.currentPartId] : undefined
 
@@ -110,7 +110,7 @@ export interface LookaheadResult {
 }
 
 export function findLookaheadForlayer (
-	rundownData: RundownData,
+	rundownData: PlayoutRundownData,
 	layer: string,
 	mode: LookaheadMode,
 	lookaheadDepth: number
@@ -232,7 +232,7 @@ export function findLookaheadForlayer (
 	return res
 }
 
-function getPartsOrderedByTime (rundownData: RundownData) {
+function getPartsOrderedByTime (rundownData: PlayoutRundownData) {
 	// This could be cached across all lookahead layers, as it doesnt care about layer
 	const activeRundown = rundownData.rundown
 
@@ -288,7 +288,7 @@ function getPartsOrderedByTime (rundownData: RundownData) {
 	}
 }
 
-function findObjectsForPart (rundownData: RundownData, layer: string, timeOrderedPartsWithPieces: PartInfoWithPieces[], startingPartOnLayerIndex: number, startingPartOnLayer: PartInfoWithPieces): (TimelineObjRundown & OnGenerateTimelineObj)[] {
+function findObjectsForPart (rundownData: PlayoutRundownData, layer: string, timeOrderedPartsWithPieces: PartInfoWithPieces[], startingPartOnLayerIndex: number, startingPartOnLayer: PartInfoWithPieces): (TimelineObjRundown & OnGenerateTimelineObj)[] {
 	const activeRundown = rundownData.rundown
 
 	// Sanity check, if no part to search, then abort
@@ -328,7 +328,7 @@ function findObjectsForPart (rundownData: RundownData, layer: string, timeOrdere
 
 			let allowTransition = false
 			let classesFromPreviousPart: string[] = []
-			if (startingPartOnLayerIndex >= 1 && activeRundown.currentPartId) {
+			if (startingPartOnLayerIndex >= 1 && activeRundown.currentPartInstanceId) {
 				const prevPieceGroup = timeOrderedPartsWithPieces[startingPartOnLayerIndex - 1]
 				allowTransition = !prevPieceGroup.part.disableOutTransition
 				classesFromPreviousPart = prevPieceGroup.part.classesForNext || []

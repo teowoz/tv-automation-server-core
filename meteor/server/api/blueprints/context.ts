@@ -22,7 +22,7 @@ import {
 	IBlueprintPiece,
 	IBlueprintSegmentDB,
 	IngestRundown,
-	IBlueprintPartDB,
+	IBlueprintPartInstance,
 	IngestPart
 } from 'tv-automation-sofie-blueprints-integration'
 import { Studio } from '../../../lib/collections/Studios'
@@ -300,9 +300,9 @@ export class EventContext extends CommonContext implements IEventContext {
 }
 
 export class PartEventContext extends RundownContext implements IPartEventContext {
-	readonly part: Readonly<IBlueprintPartDB>
+	readonly part: Readonly<IBlueprintPartInstance>
 
-	constructor (rundown: Rundown, studio: Studio | undefined, part: IBlueprintPartDB) {
+	constructor (rundown: Rundown, studio: Studio | undefined, part: IBlueprintPartInstance) {
 		super(rundown, studio)
 
 		this.part = part
@@ -359,11 +359,11 @@ export class AsRunEventContext extends RundownContext implements IAsRunEventCont
 		}
 	}
 	/** Get the mos story related to a part */
-	getIngestDataForPart (part: IBlueprintPartDB): IngestPart | undefined {
-		check(part._id, String)
+	getIngestDataForPart (part: IBlueprintPartInstance): IngestPart | undefined {
+		check(part.part._id, String)
 
 		try {
-			return loadIngestDataCachePart(this.rundown._id, this.rundown.externalId, part._id, part.externalId).data
+			return loadIngestDataCachePart(this.rundown._id, this.rundown.externalId, part.partId, part.part.externalId).data
 		} catch (e) {
 			return undefined
 		}

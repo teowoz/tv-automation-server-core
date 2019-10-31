@@ -1,5 +1,5 @@
 import * as _ from 'underscore'
-import { Time, applyClassToDocument, getCurrentTime, registerCollection, normalizeArray, waitForPromiseAll, makePromise } from '../lib'
+import { Time, applyClassToDocument, getCurrentTime, registerCollection, normalizeArray, waitForPromiseAll, makePromise, waitForPromiseAll2 } from '../lib'
 import { Segments, DBSegment, Segment } from './Segments'
 import { Parts, Part } from './Parts'
 import { FindOptions, MongoSelector, TransformedCollection } from '../typings/meteor'
@@ -16,6 +16,7 @@ import { RundownNote } from '../api/notes'
 import { IngestDataCache } from './IngestDataCache'
 import { ExpectedMediaItems } from './ExpectedMediaItems'
 import { createMongoCollection } from './lib'
+import { PartInstance, PartInstances } from './PartInstances'
 
 export enum RundownHoldState {
 	NONE = 0,
@@ -175,6 +176,19 @@ export class Rundown implements DBRundown {
 			}, options)
 		).fetch()
 	}
+	getActivePartInstances (selector?: MongoSelector<PartInstance>, options?: FindOptions) {
+		selector = selector || {}
+		options = options || {}
+		return PartInstances.find(
+			_.extend({
+				rundownId: this._id,
+				reset: { $ne: true }
+			}, selector),
+			_.extend({
+				sort: { _rank: 1 }
+			}, options)
+		).fetch()
+	}
 	remove () {
 		if (!Meteor.isServer) throw new Meteor.Error('The "remove" method is available server-side only (sorry)')
 		Rundowns.remove(this._id)
@@ -212,55 +226,67 @@ export class Rundown implements DBRundown {
 	// 	})
 	// 	return timings
 	// }
-	fetchAllData (): RundownData {
+	fetchAllData (): PlayoutRundownData {
 
 		// Do fetches in parallell:
-		let ps: [
-			Promise<{ segments: Segment[], segmentsMap: any }>,
-			Promise<{ parts: Part[], partsMap: any } >,
-			Promise<Piece[]>
-		] = [
-			makePromise(() => {
-				let segments = this.getSegments()
-				let segmentsMap = normalizeArray(segments, '_id')
-				return { segments, segmentsMap }
-			}),
-			makePromise(() => {
-				let parts = _.map(this.getParts(), (part) => {
-					// Override member function to use cached data instead:
-					part.getAllPieces = () => {
-						return _.map(_.filter(pieces, (piece) => {
-							return (
-								piece.partId === part._id
-							)
-						}), (part) => {
-							return _.clone(part)
-						})
-					}
-					return part
+		// const ps = [
+		// 	,
+		// ]
+		const r = waitForPromiseAll2(makePromise(() => {
+			let segments = this.getSegments()
+			let segmentsMap = normalizeArray(segments, '_id')
+			return { segments, segmentsMap }
+		}),
+		makePromise(() => {
+			let parts = _.map(this.getParts(), (part) => {
+				// Override member function to use cached data instead:
+				part.getAllPieces = () => {
+					return _.map(_.filter(pieces, (piece) => {
+						return (
+							piece.partId === part._id
+						)
+					}), (part) => {
+						return _.clone(part)
+					})
+				}
+				return part
 
-				})
-				let partsMap = normalizeArray(parts, '_id')
-				return { parts, partsMap }
-			}),
-			makePromise(() => {
-				return Pieces.find({ rundownId: this._id }).fetch()
 			})
-		]
-		let r: any = waitForPromiseAll(ps as any)
-		let segments: Segment[] 				= r[0].segments
-		let segmentsMap 				 		= r[0].segmentsMap
-		let partsMap 					= r[1].partsMap
-		let parts: Part[]			= r[1].parts
-		let pieces: Piece[] = r[2]
+			let partsMap = normalizeArray(parts, '_id')
+			return { parts, partsMap }
+		}),
+		makePromise(() => {
+			return Pieces.find({ rundownId: this._id }).fetch()
+		}),
+		makePromise(() => {
+			let partInstances = _.map(this.getActivePartInstances(), (instance) => {
+				// Override member function to use cached data instead:
+				instance.part.getAllPieces = () => {
+					return _.map(_.filter(pieces, (piece) => {
+						return (
+							piece.partId === instance._id
+						)
+					}), (part) => {
+						return _.clone(part)
+					})
+				}
+				return instance
+
+			})
+			let partInstancesMap = normalizeArray(partInstances, '_id')
+			return { partInstances, partInstancesMap }
+		}))
+		// const { segments, segmentsMap } = r[0] as UnPromisify<typeof ps[0]>
+		// const { parts, partsMap } = r[1] as UnPromisify<typeof ps[1]>
+		const pieces = r[2]
+		// const { partInstances, partInstancesMap } = r[3] as UnPromisify<typeof ps[3]>
 
 		return {
 			rundown: this,
-			segments,
-			segmentsMap,
-			parts,
-			partsMap,
-			pieces
+			...r[0],
+			...r[1],
+			pieces,
+			...r[3],
 		}
 	}
 	getNotes (): Array<RundownNote> {
@@ -274,14 +300,35 @@ export class Rundown implements DBRundown {
 			notes: note
 		}})
 	}
+	getSelectedPartInstances () {
+		const ids = _.compact([
+			this.currentPartInstanceId,
+			this.previousPartInstanceId,
+			this.nextPartInstanceId
+		])
+		const instances = ids.length > 0 ? PartInstances.find({
+			rundownId: this._id,
+			_id: { $in: ids }
+		}).fetch() : []
+
+		return {
+			currentPartInstance: instances.find(inst => inst._id === this.currentPartInstanceId),
+			nextPartInstance: instances.find(inst => inst._id === this.nextPartInstanceId),
+			previousPartInstance: instances.find(inst => inst._id === this.previousPartInstanceId)
+		}
+	}
 }
-export interface RundownData {
+export interface PlayoutRundownData {
 	rundown: Rundown
 	segments: Array<Segment>
-	segmentsMap: {[id: string]: Segment}
+	segmentsMap: {[id: string]: Segment | undefined}
 	parts: Array<Part>
-	partsMap: {[id: string]: Part}
+	partsMap: {[id: string]: Part | undefined}
 	pieces: Array<Piece>
+
+	// TODO - swap out for the current, next, and previous instances as that is all we should ever need
+	partInstances: Array<PartInstance>
+	partInstancesMap: {[id: string]: PartInstance | undefined}
 }
 
 // export const Rundowns = createMongoCollection<Rundown>('rundowns', {transform: (doc) => applyClassToDocument(Rundown, doc) })

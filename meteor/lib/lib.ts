@@ -779,6 +779,15 @@ export const waitForPromiseAll: <T>(ps: Array<Promise<T>>) => Array<T> = Meteor.
 		cb(e)
 	})
 })
+
+// export type UnPromise<T> = T extends Promise<infer U> ? U : T
+
+export type Promisify<T> = { [K in keyof T]: Promise<T[K]> }
+export function waitForPromiseAll2 <T extends any[]> (...args: Promisify<T>): T {
+	// TODO - this might not work with the old typescript being used. If it does uses of the old version should be replaced with this
+	return waitForPromiseAll(args as any) as any
+}
+
 export const waitForPromise: <T>(p: Promise<T>) => T = Meteor.wrapAsync(function waitForPromises<T> (p: Promise<T>, cb: (err: any | null, result?: any) => T) {
 	Promise.resolve(p)
 	.then((result) => {

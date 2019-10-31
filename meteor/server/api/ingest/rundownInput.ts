@@ -266,9 +266,9 @@ function updateRundownFromIngestData (
 			},
 
 			// omit the below fields
-			previousPartId: null,
-			currentPartId: null,
-			nextPartId: null,
+			previousPartInstanceId: null,
+			currentPartInstanceId: null,
+			nextPartInstanceId: null,
 			created: 0,
 			modified: 0,
 
@@ -292,9 +292,9 @@ function updateRundownFromIngestData (
 		beforeInsert: (o) => {
 			o.modified = getCurrentTime()
 			o.created = getCurrentTime()
-			o.previousPartId = null
-			o.currentPartId = null
-			o.nextPartId = null
+			o.previousPartInstanceId = null
+			o.currentPartInstanceId = null
+			o.nextPartInstanceId = null
 			return o
 		},
 		beforeUpdate: (o) => {

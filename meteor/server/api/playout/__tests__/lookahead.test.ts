@@ -1,6 +1,6 @@
 import { Meteor } from 'meteor/meteor'
 import { literal } from '../../../../lib/lib'
-import { RundownData, Rundown } from '../../../../lib/collections/Rundowns'
+import { PlayoutRundownData, Rundown } from '../../../../lib/collections/Rundowns'
 import { findLookaheadForlayer } from '../lookahead'
 import { LookaheadMode } from 'tv-automation-sofie-blueprints-integration'
 import { Segment } from '../../../../lib/collections/Segments'
@@ -9,7 +9,7 @@ import { Piece } from '../../../../lib/collections/Pieces'
 import { testInFiber } from '../../../../__mocks__/helpers/jest'
 
 function getSampleRundownData () {
-	const res = literal<RundownData>({
+	const res = literal<PlayoutRundownData>({
 		rundown: new Rundown({
 			_id: 'mock',
 			externalId: 'mock',

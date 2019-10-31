@@ -15,7 +15,8 @@ import {
 	asyncCollectionUpdate,
 	extendMandadory,
 	asyncCollectionUpsert,
-	getHash
+	getHash,
+	literal
 } from '../../lib/lib'
 import {
 	Rundown,
@@ -28,6 +29,7 @@ import { IBlueprintExternalMessageQueueObj, IBlueprintAsRunLogEventContent } fro
 import { queueExternalMessages } from './ExternalMessageQueue'
 import { getBlueprintOfRundown } from './blueprints/cache'
 import { AsRunEventContext } from './blueprints/context'
+import { PartInstance, PartInstances } from '../../lib/collections/PartInstances'
 
 const EVENT_WAIT_TIME = 500
 
@@ -117,85 +119,75 @@ export function reportRundownHasStarted (rundownOrId: Rundown | string, timestam
 }
 // export function reportSegmentHasStarted (segment: Segment, timestamp?: Time) {
 // }
-export function reportPartHasStarted (partOrId: Part | string , timestamp: Time) {
+export function reportPartHasStarted (partOrId: PartInstance | string , timestamp: Time) {
 
-	let part = (
+	const partInstance = (
 		_.isString(partOrId) ?
-		Parts.findOne(partOrId) :
+		PartInstances.findOne(partOrId) :
 		partOrId
 	)
-	if (part) {
+	if (partInstance) {
 		let rundown: Rundown
 
 		let r = waitForPromiseAll<any>([
-			asyncCollectionUpdate(Parts, part._id, {
+			asyncCollectionUpdate(PartInstances, partInstance._id, {
 				$set: {
-					startedPlayback: true,
-					stoppedPlayback: false,
-				},
-				$push: {
 					'timings.startedPlayback': timestamp
 				}
 			}),
-			asyncCollectionFindOne(Rundowns, part.rundownId)
+			asyncCollectionFindOne(Rundowns, partInstance.rundownId)
 		])
 		rundown = r[1]
 		// also update local object:
-		part.startedPlayback = true
-		part.stoppedPlayback = false
-		pushOntoPath(part, 'timings.startedPlayback', timestamp)
+		partInstance.timings.startedPlayback = timestamp
 
 		if (rundown) {
 			let event = pushAsRunLog({
 				studioId:			rundown.studioId,
 				rundownId:		rundown._id,
-				segmentId:			part.segmentId,
-				partId:		part._id,
+				segmentId:			partInstance.segmentId,
+				partId:		partInstance.part._id, // TODO
 				content:			IBlueprintAsRunLogEventContent.STARTEDPLAYBACK,
 				content2: 			'part'
 			}, !!rundown.rehearsal, timestamp)
 			if (event) handleEvent(event)
-		} else logger.error(`rundown "${part.rundownId}" not found in reportPartHasStarted "${part._id}"`)
+		} else logger.error(`rundown "${partInstance.rundownId}" not found in reportPartHasStarted "${partInstance._id}"`)
 	} else logger.error(`part not found in reportPartHasStarted "${partOrId}"`)
 }
-export function reportPartHasStopped (partOrId: Part | string , timestamp: Time) {
+export function reportPartHasStopped (partOrId: PartInstance | string , timestamp: Time) {
 
-	let part = (
+	let partInstance = (
 		_.isString(partOrId) ?
-		Parts.findOne(partOrId) :
+		PartInstances.findOne(partOrId) :
 		partOrId
 	)
-	if (part) {
+	if (partInstance) {
 		let rundown: Rundown
 
 		let r = waitForPromiseAll<any>([
-			asyncCollectionUpdate(Parts, part._id, {
+			asyncCollectionUpdate(Parts, partInstance._id, {
 				$set: {
-					stoppedPlayback: true,
-				},
-				$push: {
 					'timings.stoppedPlayback': timestamp
 				}
 			}),
-			asyncCollectionFindOne(Rundowns, part.rundownId)
+			asyncCollectionFindOne(Rundowns, partInstance.rundownId)
 		])
 		rundown = r[1]
 		// also update local object:
-		part.stoppedPlayback = true
-		pushOntoPath(part, 'timings.stoppedPlayback', timestamp)
+		partInstance.timings.stoppedPlayback = timestamp
 
 		if (rundown) {
 			let event = pushAsRunLog({
 				studioId:			rundown.studioId,
 				rundownId:		rundown._id,
-				segmentId:			part.segmentId,
-				partId:		part._id,
+				segmentId:			partInstance.segmentId,
+				partId:		partInstance.part._id, // TODO
 				content:			IBlueprintAsRunLogEventContent.STOPPEDPLAYBACK,
 				content2: 			'part'
 			}, !!rundown.rehearsal, timestamp)
 			if (event) handleEvent(event)
 			return event
-		} else logger.error(`rundown "${part.rundownId}" not found in reportPartHasStopped "${part._id}"`)
+		} else logger.error(`rundown "${partInstance.rundownId}" not found in reportPartHasStopped "${partInstance._id}"`)
 	} else logger.error(`part not found in reportPartHasStopped "${partOrId}"`)
 }
 

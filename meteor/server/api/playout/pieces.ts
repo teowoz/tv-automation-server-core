@@ -27,7 +27,7 @@ import { Random } from 'meteor/random'
 import { prefixAllObjectIds } from './lib'
 import { DeviceType } from 'timeline-state-resolver-types'
 import { calculatePieceTimelineEnable } from '../../../lib/Rundown'
-import { RundownData } from '../../../lib/collections/Rundowns'
+import { PlayoutRundownData } from '../../../lib/collections/Rundowns'
 import { postProcessAdLibPieces } from '../blueprints/postProcess'
 
 export interface PieceResolved extends Piece {
@@ -270,7 +270,7 @@ export function getResolvedPieces (part: Part): Piece[] {
 	return processedPieces
 }
 
-export function getResolvedPiecesFromFullTimeline (rundownData: RundownData, allObjs: TimelineObjGeneric[]): { pieces: Piece[], time: number } {
+export function getResolvedPiecesFromFullTimeline (rundownData: PlayoutRundownData, allObjs: TimelineObjGeneric[]): { pieces: Piece[], time: number } {
 	const objs = clone(allObjs.filter(o => o.isGroup && ((o as any).isPartGroup || (o.metadata && o.metadata.pieceId))))
 
 	const now = getCurrentTime()

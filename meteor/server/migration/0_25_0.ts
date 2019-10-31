@@ -225,10 +225,10 @@ addMigrationSteps('0.25.0', [
 			externalId: 'mosId',
 			studioId: 'studioInstallationId',
 			peripheralDeviceId: 'mosDeviceId',
-			currentPartId: 'currentSegmentLineId',
-			nextPartId: 'nextSegmentLineId',
+			currentPartInstanceId: 'currentSegmentLineId',
+			nextPartInstanceId: 'nextSegmentLineId',
 			nextPartManual: 'nextSegmentLineManual',
-			previousPartId: 'previousSegmentLineId',
+			previousPartInstanceId: 'previousSegmentLineId',
 			notifiedCurrentPlayingPartExternalId: 'currentPlayingStoryStatus',
 		},
 		'migrateDatabaseCollections'
@@ -262,7 +262,7 @@ addMigrationSteps('0.25.0', [
 			segmentId: 'string',
 			rundownId: 'runningOrderId',
 			title: 'slug',
-			afterPart: 'afterSegmentLine',
+			// afterPart: 'afterSegmentLine',
 		},
 		'migrateDatabaseCollections'
 	),

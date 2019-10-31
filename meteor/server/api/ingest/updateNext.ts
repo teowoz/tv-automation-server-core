@@ -16,14 +16,16 @@ function getRundownValidParts (rundown: Rundown) {
 export namespace UpdateNext {
 	export function ensureNextPartIsValid (rundown: Rundown) {
 		// Ensure the next-id is still valid
-		if (rundown && rundown.active && rundown.nextPartId) {
+		if (rundown && rundown.active && rundown.nextPartInstanceId) {
 			const allValidParts = getRundownValidParts(rundown)
+			const { currentPartInstance, nextPartInstance } = rundown.getSelectedPartInstances()
 
-			const currentPart = allValidParts.find(part => part._id === rundown.currentPartId)
-			const currentNextPart = allValidParts.find(part => part._id === rundown.nextPartId)
+			const currentPart = currentPartInstance ? allValidParts.find(part => part._id === currentPartInstance.part._id) : undefined
+			const currentNextPart = nextPartInstance ? allValidParts.find(part => part._id === nextPartInstance.part._id) : undefined
+			const currentNextPartId = currentNextPart ? currentNextPart._id : null
 
 			// If the current part is missing, then we can't know what the next is
-			if (!currentPart && rundown.currentPartId !== null) {
+			if (!currentPart && rundown.currentPartInstanceId !== null) {
 				if (!currentNextPart) {
 					// Clear the invalid data
 					ServerPlayoutAPI.setNextPartInner(rundown, null)
@@ -33,10 +35,10 @@ export namespace UpdateNext {
 				const expectedAutoNextPartId = expectedAutoNextPart ? expectedAutoNextPart._id : null
 
 				// If not manually set, make sure that next is done by rank
-				if (!rundown.nextPartManual && expectedAutoNextPartId !== rundown.nextPartId) {
+				if (!rundown.nextPartManual && expectedAutoNextPartId !== currentNextPartId) {
 					ServerPlayoutAPI.setNextPartInner(rundown, expectedAutoNextPart || null)
 
-				} else if (rundown.nextPartId && !currentNextPart) {
+				} else if (rundown.nextPartInstanceId && !currentNextPart) {
 					// If the specified next is not valid, then reset
 					ServerPlayoutAPI.setNextPartInner(rundown, expectedAutoNextPart || null)
 				}
@@ -46,7 +48,7 @@ export namespace UpdateNext {
 	export function afterInsertParts (rundown: Rundown, newPartExternalIds: string[], removePrevious: boolean) {
 		if (rundown && rundown.active) {
 
-			if (!rundown.nextPartId && rundown.currentPartId) {
+			if (!rundown.nextPartInstanceId && rundown.currentPartInstanceId) {
 				// The playhead is probably at the end of the rundown
 
 				// Set Next forward
@@ -55,10 +57,11 @@ export namespace UpdateNext {
 			} else if (rundown.nextPartManual && removePrevious) {
 				// If a part was manually chosen as Next, that could have been removed by a Replacement
 
+				const { currentPartInstance, nextPartInstance } = rundown.getSelectedPartInstances()
 				const allValidParts = getRundownValidParts(rundown)
 
 				// If the manually chosen part does not exist, assume it was the one that was removed
-				const currentNextPart = allValidParts.find(part => part._id === rundown.nextPartId)
+				const currentNextPart = nextPartInstance ? allValidParts.find(part => part._id === nextPartInstance.part._id) : undefined
 				if (!currentNextPart) {
 					// Set to the first of the inserted parts
 					const firstNewPart = allValidParts.find(part => newPartExternalIds.indexOf(part.externalId) !== -1)

@@ -1,4 +1,5 @@
 import { Meteor } from 'meteor/meteor'
+import { Random } from 'meteor/random'
 import * as _ from 'underscore'
 import { logger } from '../../logging'
 import { Rundown, Rundowns, RundownHoldState, DBRundown } from '../../../lib/collections/Rundowns'
@@ -10,9 +11,9 @@ import {
 	waitForPromiseAll,
 	asyncCollectionRemove,
 	Time,
-	pushOntoPath,
 	clone,
-	toc
+	literal,
+	asyncCollectionInsert
 } from '../../../lib/lib'
 import { TimelineObjGeneric } from '../../../lib/collections/Timeline'
 import { loadCachedIngestSegment } from '../ingest/ingestCache'
@@ -20,6 +21,7 @@ import { updateSegmentsFromIngestData } from '../ingest/rundownInput'
 import { updateSourceLayerInfinitesAfterPart } from './infinites'
 import { Studios } from '../../../lib/collections/Studios'
 import { DBSegment, Segments } from '../../../lib/collections/Segments'
+import { PartInstance, PartInstances } from '../../../lib/collections/PartInstances'
 
 /**
  * Reset the rundown:
@@ -33,34 +35,34 @@ export function resetRundown (rundown: Rundown) {
 		dynamicallyInserted: true
 	})
 
-	Parts.remove({
-		rundownId: rundown._id,
-		dynamicallyInserted: true
-	})
+	// Parts.remove({
+	// 	rundownId: rundown._id,
+	// 	dynamicallyInserted: true
+	// })
 
-	Parts.update({
-		rundownId: rundown._id
-	}, {
-		$unset: {
-			duration: 1,
-			previousPartEndState: 1,
-			startedPlayback: 1,
-			timings: 1,
-			runtimeArguments: 1,
-			stoppedPlayback: 1
-		}
-	}, { multi: true })
+	// Parts.update({
+	// 	rundownId: rundown._id
+	// }, {
+	// 	$unset: {
+	// 		duration: 1,
+	// 		previousPartEndState: 1,
+	// 		startedPlayback: 1,
+	// 		timings: 1,
+	// 		runtimeArguments: 1,
+	// 		stoppedPlayback: 1
+	// 	}
+	// }, { multi: true })
 
-	const dirtyParts = Parts.find({
-		rundownId: rundown._id,
-		dirty: true
-	}).fetch()
-	dirtyParts.forEach(part => {
-		refreshPart(rundown, part)
-		Parts.update(part._id, {$unset: {
-			dirty: 1
-		}})
-	})
+	// const dirtyParts = Parts.find({
+	// 	rundownId: rundown._id,
+	// 	dirty: true
+	// }).fetch()
+	// dirtyParts.forEach(part => {
+	// 	refreshPart(rundown, part)
+	// 	Parts.update(part._id, {$unset: {
+	// 		dirty: 1
+	// 	}})
+	// })
 
 	// Reset all pieces that were modified for holds
 	Pieces.update({
@@ -103,15 +105,14 @@ export function resetRundown (rundown: Rundown) {
 }
 function resetRundownPlayhead (rundown: Rundown) {
 	logger.info('resetRundownPlayhead ' + rundown._id)
-	let parts = rundown.getParts()
 
 	Rundowns.update(rundown._id, {
-		$set: {
-			previousPartId: null,
-			currentPartId: null,
-			updateStoryStatus: null,
+		$set: literal<Partial<Rundown>>({
+			previousPartInstanceId: null,
+			currentPartInstanceId: null,
+			nextPartInstanceId: null,
 			holdState: RundownHoldState.NONE,
-		}, $unset: {
+		}), $unset: {
 			startedPlayback: 1,
 			previousPersistentState: 1
 		}
@@ -119,7 +120,7 @@ function resetRundownPlayhead (rundown: Rundown) {
 
 	if (rundown.active) {
 		// put the first on queue:
-		setNextPart(rundown, _.first(parts) || null)
+		setNextPart(rundown, _.first(rundown.getParts()) || null)
 	} else {
 		setNextPart(rundown, null)
 	}
@@ -164,43 +165,78 @@ export function setNextPart (
 	setManually?: boolean,
 	nextTimeOffset?: number | undefined
 ) {
+	let shouldResetNextPartInstance = setManually
+	const { nextPartInstance } = rundown.getSelectedPartInstances()
+	if (rundown.currentPartInstanceId && rundown.nextPartInstanceId && rundown.currentPartInstanceId === rundown.nextPartInstanceId) {
+		// If current and next are the same, then we need a new instance
+		shouldResetNextPartInstance = true
+	} else if (!shouldResetNextPartInstance && nextPart) {
+		if (nextPartInstance && nextPartInstance.part._id === nextPart._id) {
+			shouldResetNextPartInstance = true
+		}
+	}
+
+	if (nextPart && nextPart.invalid) {
+		throw new Meteor.Error(400, 'Part is marked as invalid, cannot set as next.')
+	}
+	if (nextPart && nextPart.rundownId !== rundown._id) {
+		throw new Meteor.Error(409, `Part "${nextPart._id}" not part of rundown "${rundown._id}"`)
+	}
+
+	// if (nextPart._id === rundown.currentPartId) {
+	// 	throw new Meteor.Error(402, 'Not allowed to Next the currently playing Part')
+	// }
+
 	let ps: Array<Promise<any>> = []
+
+	// Remove any instances which havent been taken
+	if (shouldResetNextPartInstance || !nextPartInstance) {
+		ps.push(asyncCollectionRemove(PartInstances, {
+			rundownId: rundown._id,
+			'timings.take': { $exists: false }
+		}))
+	}
+
 	if (nextPart) {
-
-		if (nextPart.rundownId !== rundown._id) throw new Meteor.Error(409, `Part "${nextPart._id}" not part of rundown "${rundown._id}"`)
-		if (nextPart._id === rundown.currentPartId) {
-			throw new Meteor.Error(402, 'Not allowed to Next the currently playing Part')
-		}
-		if (nextPart.invalid) {
-			throw new Meteor.Error(400, 'Part is marked as invalid, cannot set as next.')
-		}
-
 		ps.push(resetPart(nextPart))
 
+		// create new instance
+		let newInstanceId: string
+		if (nextPartInstance && nextPartInstance.part._id === nextPart._id) {
+			// Re-use existing
+			newInstanceId = nextPartInstance._id
+		} else {
+			newInstanceId = `${nextPart._id}_${Random.id()}`
+			ps.push(asyncCollectionInsert(PartInstances, {
+				_id: newInstanceId,
+				rundownId: rundown._id,
+				segmentId: nextPart.segmentId,
+				part: nextPart,
+				timings: {
+					next: getCurrentTime()
+				}
+			}))
+		}
+
 		ps.push(asyncCollectionUpdate(Rundowns, rundown._id, {
-			$set: {
-				nextPartId: nextPart._id,
+			$set: literal<Partial<Rundown>>({
+				nextPartInstanceId: newInstanceId,
 				nextPartManual: !!setManually,
 				nextTimeOffset: nextTimeOffset || null
-			}
+			})
 		}))
-		rundown.nextPartId = nextPart._id
+		rundown.nextPartInstanceId = newInstanceId
 		rundown.nextPartManual = !!setManually
 		rundown.nextTimeOffset = nextTimeOffset || null
 
-		ps.push(asyncCollectionUpdate(Parts, nextPart._id, {
-			$push: {
-				'timings.next': getCurrentTime()
-			}
-		}))
 	} else {
 		ps.push(asyncCollectionUpdate(Rundowns, rundown._id, {
-			$set: {
-				nextPartId: null,
+			$set: literal<Partial<Rundown>>({
+				nextPartInstanceId: null,
 				nextPartManual: !!setManually
-			}
+			})
 		}))
-		rundown.nextPartId = null
+		rundown.nextPartInstanceId = null
 		rundown.nextPartManual = !!setManually
 	}
 
@@ -210,20 +246,19 @@ export function setNextPart (
 function resetPart (part: DBPart): Promise<void> {
 	let ps: Array<Promise<any>> = []
 
-
-	ps.push(asyncCollectionUpdate(Parts, {
-		// rundownId: part.rundownId,
-		_id: part._id
-	}, {
-		$unset: {
-			duration: 1,
-			previousPartEndState: 1,
-			startedPlayback: 1,
-			runtimeArguments: 1,
-			dirty: 1,
-			stoppedPlayback: 1
-		}
-	}))
+	// ps.push(asyncCollectionUpdate(Parts, {
+	// 	// rundownId: part.rundownId,
+	// 	_id: part._id
+	// }, {
+	// 	$unset: {
+	// 		duration: 1,
+	// 		previousPartEndState: 1,
+	// 		startedPlayback: 1,
+	// 		runtimeArguments: 1,
+	// 		dirty: 1,
+	// 		stoppedPlayback: 1
+	// 	}
+	// }))
 	ps.push(asyncCollectionUpdate(Pieces, {
 		// rundownId: part.rundownId,
 		partId: part._id
@@ -238,11 +273,11 @@ function resetPart (part: DBPart): Promise<void> {
 		multi: true
 	}))
 	// remove parts that have been dynamically queued for after this part (queued adLibs)
-	ps.push(asyncCollectionRemove(Parts, {
-		rundownId: part.rundownId,
-		afterPart: part._id,
-		dynamicallyInserted: true
-	}))
+	// ps.push(asyncCollectionRemove(Parts, {
+	// 	rundownId: part.rundownId,
+	// 	afterPart: part._id,
+	// 	dynamicallyInserted: true
+	// }))
 
 	// Remove all pieces that have been dynamically created (such as adLib pieces)
 	ps.push(asyncCollectionRemove(Pieces, {
@@ -264,42 +299,41 @@ function resetPart (part: DBPart): Promise<void> {
 		multi: true
 	}))
 
-	let isDirty = part.dirty || false
+	// let isDirty = part.dirty || false
 
-	if (isDirty) {
-		return new Promise((resolve, reject) => {
-			const rundown = Rundowns.findOne(part.rundownId)
-			if (!rundown) throw new Meteor.Error(404, `Rundown "${part.rundownId}" not found!`)
+	// if (isDirty) {
+	// 	return new Promise((resolve, reject) => {
+	// 		const rundown = Rundowns.findOne(part.rundownId)
+	// 		if (!rundown) throw new Meteor.Error(404, `Rundown "${part.rundownId}" not found!`)
 
-			Promise.all(ps)
-			.then(() => {
-				refreshPart(rundown, part)
-				resolve()
-			}).catch((e) => reject())
-		})
-	} else {
-		const rundown = Rundowns.findOne(part.rundownId)
-		if (!rundown) throw new Meteor.Error(404, `Rundown "${part.rundownId}" not found!`)
-		const prevPart = getPreviousPart(part)
+	// 		Promise.all(ps)
+	// 		.then(() => {
+	// 			refreshPart(rundown, part)
+	// 			resolve()
+	// 		}).catch((e) => reject())
+	// 	})
+	// } else {
+	const rundown = Rundowns.findOne(part.rundownId)
+	if (!rundown) throw new Meteor.Error(404, `Rundown "${part.rundownId}" not found!`)
+	const prevPart = getPreviousPart(part)
 
-
-		return Promise.all(ps)
-		.then(() => {
-			updateSourceLayerInfinitesAfterPart(rundown, prevPart)
-			// do nothing
-		})
-	}
+	return Promise.all(ps)
+	.then(() => {
+		updateSourceLayerInfinitesAfterPart(rundown, prevPart)
+		// do nothing
+	})
+	// }
 }
-export function onPartHasStoppedPlaying (part: Part, stoppedPlayingTime: Time) {
-	const lastStartedPlayback = part.getLastStartedPlayback()
-	if (part.startedPlayback && lastStartedPlayback && lastStartedPlayback > 0) {
-		Parts.update(part._id, {
+export function onPartHasStoppedPlaying (partInstance: PartInstance, stoppedPlayingTime: Time) {
+	if (partInstance.timings.startedPlayback && partInstance.timings.startedPlayback > 0) {
+		PartInstances.update(partInstance._id, {
 			$set: {
-				duration: stoppedPlayingTime - lastStartedPlayback
+				duration: stoppedPlayingTime - partInstance.timings.startedPlayback,
+				'timings.stoppedPlayback': stoppedPlayingTime
 			}
 		})
-		part.duration = stoppedPlayingTime - lastStartedPlayback
-		pushOntoPath(part, 'timings.stoppedPlayback', stoppedPlayingTime)
+		partInstance.duration = stoppedPlayingTime - partInstance.timings.startedPlayback
+		partInstance.timings.stoppedPlayback = stoppedPlayingTime
 	} else {
 		// logger.warn(`Part "${part._id}" has never started playback on rundown "${rundownId}".`)
 	}
