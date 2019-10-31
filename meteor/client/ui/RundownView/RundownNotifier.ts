@@ -373,7 +373,7 @@ class RundownViewNotifier extends WithManagedTracker {
 									label: t('Show issue'),
 									type: 'default'
 								}
-							], part._rank)
+							], (segment ? segment._rank : 0) * 1000 + part._rank / 1000) // TODO: This is a rank hack and it should be fixed some time
 							newNotification.on('action', (notification, type, e) => {
 								switch (type) {
 									case 'default':
