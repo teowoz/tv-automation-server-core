@@ -117,7 +117,7 @@ export const SegmentTimelineContainer = withTracker<IProps, IState, ITrackedProp
 	let o = getResolvedSegment(props.showStyleBase, props.rundown, segment)
 	let notes: Array<PartNote> = []
 	_.each(o.parts, (part) => {
-		notes = notes.concat(part.getNotes(true))
+		notes = notes.concat(part.part.getNotes(true))
 	})
 	notes = notes.concat(segment.notes || [])
 
@@ -321,8 +321,8 @@ export const SegmentTimelineContainer = withTracker<IProps, IState, ITrackedProp
 				(e.detail.currentTime - lastStartedPlayback + partOffset) :
 				(partOffset + lastPlayOffset)
 
-			let onAirPartDuration = (this.props.currentLivePart.duration || this.props.currentLivePart.expectedDuration || 0)
-			if (this.props.currentLivePart.displayDurationGroup && !this.props.currentLivePart.displayDuration) {
+			let onAirPartDuration = (this.props.currentLivePart.duration || this.props.currentLivePart.part.expectedDuration || 0)
+			if (this.props.currentLivePart.part.displayDurationGroup && !this.props.currentLivePart.part.displayDuration) {
 				onAirPartDuration = this.props.currentLivePart.renderedDuration || onAirPartDuration
 			}
 

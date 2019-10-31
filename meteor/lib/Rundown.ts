@@ -130,7 +130,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 			let rawFollowingPart = Parts.findOne({
 				rundownId: segment.rundownId,
 				_rank: {
-					$gt: parts[parts.length - 1]._rank
+					$gt: parts[parts.length - 1].part._rank
 				}
 			}, { sort: { _rank: 1 } })
 			if (rawFollowingPart) {
@@ -143,7 +143,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 				}) : undefined) || WrapPartToTemporaryInstance(rawFollowingPart)
 
 				let pieces = Pieces.find({
-					partId: firstFollowingPart.partId
+					partId: firstFollowingPart.part._id
 				}).fetch()
 
 				followingPart = extendMandadory<PartInstance, PartInstanceExtended>(firstFollowingPart, {
@@ -201,14 +201,14 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 		const displayDurationGroups: _.Dictionary<number> = {}
 
 		let startsAt = 0
-		let previousPart: PartInstanceExtended
+		let previousPart: PartInstanceExtended | undefined
 		// fetch all the pieces for the parts
 		partsE = _.map(parts, (part, itIndex) => {
 			let partTimeline: SuperTimeline.TimelineObject[] = []
 
 			// extend objects to match the Extended interface
 			let partE: PartInstanceExtended = extendMandadory(part, {
-				pieces: _.map(Pieces.find({ partId: part.partId }).fetch(), (piece) => {
+				pieces: _.map(Pieces.find({ partId: part.part._id }).fetch(), (piece) => {
 					return extendMandadory<Piece, PieceExtended>(piece, {
 						renderedDuration: 0,
 						renderedInPoint: 0
@@ -216,11 +216,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 				}),
 				renderedDuration: 0,
 				startsAt: 0,
-				willProbablyAutoNext: (
-						(previousPart || {}).autoNext || false
-					) && (
-						(previousPart || {}).expectedDuration !== 0
-					)
+				willProbablyAutoNext: !!(previousPart && previousPart.part.autoNext && previousPart.part.expectedDuration !== 0)
 			})
 
 			// set the flags for isLiveSegment, isNextSegment, autoNextPart, hasAlreadyPlayed
@@ -233,13 +229,10 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 			}
 			autoNextPart = !!(
 				currentLivePart &&
-				currentLivePart.autoNext &&
+				currentLivePart.part.autoNext &&
 				(
-					(
-						currentLivePart &&
-						currentLivePart.expectedDuration !== undefined
-					) ?
-					currentLivePart.expectedDuration !== 0 :
+					currentLivePart.part.expectedDuration !== undefined ?
+					currentLivePart.part.expectedDuration !== 0 :
 					false
 				)
 			)
@@ -335,7 +328,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 			})
 
 			// use the expectedDuration and fallback to the DEFAULT_DISPLAY_DURATION for the part
-			partE.renderedDuration = partE.expectedDuration || DEFAULT_DISPLAY_DURATION // furthestDuration
+			partE.renderedDuration = partE.part.expectedDuration || DEFAULT_DISPLAY_DURATION // furthestDuration
 
 			// displayDuration groups are sets of Parts that share their expectedDurations.
 			// If a member of the group has a displayDuration > 0, this displayDuration is used as the renderedDuration of a part.
@@ -343,15 +336,15 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 			// If a member has a displayDuration == 0, it will use up whatever is available in the pool.
 			// displayDurationGroups is specifically designed for a situation where the Rundown has a lead-in piece to camera
 			// and then has a B-Roll to be played out over a VO from the host.
-			if (partE.displayDurationGroup && (
+			if (partE.part.displayDurationGroup && (
 				// either this is not the first element of the displayDurationGroup
-				(displayDurationGroups[partE.displayDurationGroup] !== undefined) ||
+				(displayDurationGroups[partE.part.displayDurationGroup] !== undefined) ||
 				// or there is a following member of this displayDurationGroup
-				(parts[itIndex + 1] && parts[itIndex + 1].displayDurationGroup === partE.displayDurationGroup)
+				(parts[itIndex + 1] && parts[itIndex + 1].part.displayDurationGroup === partE.part.displayDurationGroup)
 			)) {
-				displayDurationGroups[partE.displayDurationGroup] = (displayDurationGroups[partE.displayDurationGroup] || 0) + (partE.expectedDuration || 0)
-				partE.renderedDuration = partE.duration || Math.min(partE.displayDuration || 0, partE.expectedDuration || 0) || displayDurationGroups[partE.displayDurationGroup]
-				displayDurationGroups[partE.displayDurationGroup] = Math.max(0, displayDurationGroups[partE.displayDurationGroup] - (partE.duration || partE.renderedDuration))
+				displayDurationGroups[partE.part.displayDurationGroup] = (displayDurationGroups[partE.part.displayDurationGroup] || 0) + (partE.part.expectedDuration || 0)
+				partE.renderedDuration = partE.duration || Math.min(partE.part.displayDuration || 0, partE.part.expectedDuration || 0) || displayDurationGroups[partE.part.displayDurationGroup]
+				displayDurationGroups[partE.part.displayDurationGroup] = Math.max(0, displayDurationGroups[partE.part.displayDurationGroup] - (partE.duration || partE.renderedDuration))
 			}
 
 			// push the startsAt value, to figure out when each of the parts starts, relative to the beginning of the segment
@@ -451,7 +444,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 
 		if (isNextSegment && !isLiveSegment && !autoNextPart && rundown.currentPartInstanceId) {
 			const currentOtherPart = PartInstances.findOne(rundown.currentPartInstanceId)
-			if (currentOtherPart && currentOtherPart.expectedDuration && currentOtherPart.autoNext) {
+			if (currentOtherPart && currentOtherPart.part.expectedDuration && currentOtherPart.part.autoNext) {
 				autoNextPart = true
 			}
 		}

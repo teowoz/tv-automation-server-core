@@ -13,8 +13,10 @@ import { DBPart, Part } from './Parts'
 
 
 /** A "Line" in NRK Lingo. */
-export interface DBPartInstance extends DBPart, IBlueprintPartInstance {
-	partId: string
+export interface DBPartInstance extends IBlueprintPartInstance {
+	rundownId: string
+
+	part: DBPart
 
 	// /** Whether the part has started playback (the most recent time it was played).
 	//  * This is reset each time setAsNext is used.
@@ -53,9 +55,12 @@ export interface PartInstanceTimings extends IBlueprintPartInstanceTimings {
 	playOffset?: Time
 }
 
-export class PartInstance extends Part implements DBPartInstance {
-	public partId: string
+export class PartInstance implements DBPartInstance {
 	// From IBlueprintPartInstance:
+	public part: Part
+	public _id: string
+	public segmentId: string
+	public rundownId: string
 	public timings: PartInstanceTimings
 	// From DBPart:
 	// public startedPlayback?: boolean
@@ -69,7 +74,10 @@ export class PartInstance extends Part implements DBPartInstance {
 	public reset?: boolean
 
 	constructor (document: DBPartInstance) {
-		super(document)
+		_.each(_.keys(document), (key) => {
+			this[key] = document[key]
+		})
+		this.part = new Part(document.part)
 	}
 	// getTimings () {
 	// 	// return a chronological list of timing events
@@ -123,15 +131,16 @@ export class PartInstance extends Part implements DBPartInstance {
 
 export function WrapPartToTemporaryInstance (part: DBPart): PartInstance {
 	return new PartInstance({
-		...part,
 		_id: `${part._id}_tmp_instance`,
-		partId: part._id,
+		rundownId: part.rundownId,
+		segmentId: part.segmentId,
+		part: new Part(part),
 		timings: {}
 	})
 }
 
 export function FindInstanceOrWrapToTemporary (partInstances: PartInstance[], part: DBPart): PartInstance {
-	return partInstances.find(instance => instance.partId === part._id) || WrapPartToTemporaryInstance(part)
+	return partInstances.find(instance => instance.part._id === part._id) || WrapPartToTemporaryInstance(part)
 }
 
 export const PartInstances: TransformedCollection<PartInstance, DBPartInstance> = createMongoCollection<PartInstance>('partInstances', { transform: (doc) => applyClassToDocument(PartInstance, doc) })

@@ -277,8 +277,9 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 		if (rundown && parts) {
 			parts.forEach((rawPart, itIndex) => {
 				// add piece to accumulator
-				const part = _.find(partInstances, instance => instance.partId === rawPart._id) || WrapPartToTemporaryInstance(rawPart)
-				const aIndex = this.linearParts.push([part.partId, waitAccumulator]) - 1
+				const partInstance = _.find(partInstances, instance => instance.part._id === rawPart._id) || WrapPartToTemporaryInstance(rawPart)
+				const part = partInstance.part
+				const aIndex = this.linearParts.push([part._id, waitAccumulator]) - 1
 
 				// if this is next segementLine, clear previous countdowns and clear accumulator
 				if (rundown.nextPartInstanceId === part._id) {
@@ -290,19 +291,19 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 				// expected is just a sum of expectedDurations
 				totalRundownDuration += part.expectedDuration || 0
 
-				const lastStartedPlayback = part.timings.startedPlayback
-				const playOffset = part.timings.playOffset || 0
+				const lastStartedPlayback = partInstance.timings.startedPlayback
+				const playOffset = partInstance.timings.playOffset || 0
 
 				// asPlayed is the actual duration so far and expected durations in unplayed lines
 				// item is onAir right now, and it's already taking longer than rendered/expectedDuration
 				if (
 					lastStartedPlayback &&
-					!part.duration &&
+					!partInstance.duration &&
 					lastStartedPlayback + (part.expectedDuration || 0) < now
 				) {
 					asPlayedRundownDuration += (now - lastStartedPlayback)
 				} else {
-					asPlayedRundownDuration += (part.duration || part.expectedDuration || 0)
+					asPlayedRundownDuration += (partInstance.duration || part.expectedDuration || 0)
 				}
 
 				let partDuration = 0
@@ -331,16 +332,16 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 						|| Math.max(0, this.displayDurationGroups[part.displayDurationGroup], this.props.defaultDuration || DEFAULT_DURATION)
 					memberOfDisplayDurationGroup = true
 				}
-				if (lastStartedPlayback && !part.duration) {
-					currentRemaining = Math.max(0, (part.duration ||
+				if (lastStartedPlayback && !partInstance.duration) {
+					currentRemaining = Math.max(0, (partInstance.duration ||
 						(memberOfDisplayDurationGroup ?
 							displayDurationFromGroup :
 							part.expectedDuration) ||
 						0)
 						- (now - lastStartedPlayback))
-					partDuration = Math.max((part.duration || part.expectedDuration || 0),
+					partDuration = Math.max((partInstance.duration || part.expectedDuration || 0),
 						(now - lastStartedPlayback)) - playOffset
-					partDisplayDuration = Math.max((part.duration ||
+					partDisplayDuration = Math.max((partInstance.duration ||
 						(memberOfDisplayDurationGroup ?
 							displayDurationFromGroup :
 							part.expectedDuration) ||
@@ -348,12 +349,12 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 						(now - lastStartedPlayback))
 					this.partPlayed[part._id] = (now - lastStartedPlayback)
 				} else {
-					partDuration = (part.duration || part.expectedDuration || 0) - playOffset
-					partDisplayDuration = Math.max(0, part.duration && (part.duration + playOffset)
+					partDuration = (partInstance.duration || part.expectedDuration || 0) - playOffset
+					partDisplayDuration = Math.max(0, partInstance.duration && (partInstance.duration + playOffset)
 						|| displayDurationFromGroup
 						|| part.expectedDuration
 						|| this.props.defaultDuration || DEFAULT_DURATION)
-					this.partPlayed[part._id] = (part.duration || 0) - playOffset
+					this.partPlayed[part._id] = (partInstance.duration || 0) - playOffset
 				}
 
 				// Handle invalid parts by overriding the values to preset values for Invalid parts
@@ -369,7 +370,7 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 						this.displayDurationGroups[part.displayDurationGroup] - partDisplayDuration
 				}
 
-				this.partExpectedDurations[part._id] = part.expectedDuration || part.duration || 0
+				this.partExpectedDurations[part._id] = part.expectedDuration || partInstance.duration || 0
 				this.partStartsAt[part._id] = startsAtAccumulator
 				this.partDisplayStartsAt[part._id] = displayStartsAtAccumulator
 				this.partDurations[part._id] = partDuration
@@ -380,9 +381,9 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 				// always add the full duration, in case by some manual intervention this segment should play twice
 				// console.log('%c' + item._id + ', ' + waitAccumulator, 'color: red')
 				if (memberOfDisplayDurationGroup) {
-					waitAccumulator += (part.duration || partDisplayDuration || part.expectedDuration || 0)
+					waitAccumulator += (partInstance.duration || partDisplayDuration || part.expectedDuration || 0)
 				} else {
-					waitAccumulator += (part.duration || part.expectedDuration || 0)
+					waitAccumulator += (partInstance.duration || part.expectedDuration || 0)
 				}
 
 				// remaining is the sum of unplayed lines + whatever is left of the current segment
@@ -391,7 +392,7 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 					// item is onAir right now, and it's is currently shorter than expectedDuration
 				} else if (
 					lastStartedPlayback &&
-					!part.duration &&
+					!partInstance.duration &&
 					rundown.currentPartInstanceId === part._id &&
 					lastStartedPlayback + (part.expectedDuration || 0) > now
 				) {

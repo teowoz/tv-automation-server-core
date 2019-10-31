@@ -33,20 +33,20 @@ export const SegmentContextMenu = translate()(class extends React.Component<Tran
 			this.props.studioMode && this.props.rundown && this.props.rundown.active ?
 				<Escape to='document'>
 					<ContextMenu id='segment-timeline-context-menu'>
-						{part && !part.invalid && timecode !== null && <React.Fragment>
-							{startsAt !== null && <MenuItem onClick={(e) => this.props.onSetNext(part, e)} disabled={part._id === this.props.rundown.currentPartInstanceId}>
+						{part && !part.part.invalid && timecode !== null && <React.Fragment>
+							{startsAt !== null && <MenuItem onClick={(e) => this.props.onSetNext(part.part, e)} disabled={part._id === this.props.rundown.currentPartInstanceId}>
 								<span dangerouslySetInnerHTML={{ __html: t('Set this part as <strong>Next</strong>') }}></span> ({RundownUtils.formatTimeToShortTime(Math.floor(startsAt / 1000) * 1000)})
 							</MenuItem>}
 							{(startsAt !== null && part) ? <React.Fragment>
-								<MenuItem onClick={(e) => this.onSetAsNextFromHere(part, e)} disabled={part._id === this.props.rundown.currentPartInstanceId}>
+								<MenuItem onClick={(e) => this.onSetAsNextFromHere(part.part, e)} disabled={part._id === this.props.rundown.currentPartInstanceId}>
 									<span dangerouslySetInnerHTML={{ __html: t('Set <strong>Next</strong> Here') }}></span> ({RundownUtils.formatTimeToShortTime(Math.floor((startsAt + timecode) / 1000) * 1000)})
 								</MenuItem>
-								<MenuItem onClick={(e) => this.onPlayFromHere(part, e)} disabled={part._id === this.props.rundown.currentPartInstanceId}>
+								<MenuItem onClick={(e) => this.onPlayFromHere(part.part, e)} disabled={part._id === this.props.rundown.currentPartInstanceId}>
 									<span dangerouslySetInnerHTML={{ __html: t('Play from Here') }}></span> ({RundownUtils.formatTimeToShortTime(Math.floor((startsAt + timecode) / 1000) * 1000)})
 								</MenuItem>
 							</React.Fragment> : null}
 						</React.Fragment>}
-						{part && timecode === null && <MenuItem onClick={(e) => this.props.onSetNext(part, e)} disabled={part._id === this.props.rundown.currentPartInstanceId}>
+						{part && timecode === null && <MenuItem onClick={(e) => this.props.onSetNext(part.part, e)} disabled={part._id === this.props.rundown.currentPartInstanceId}>
 							<span dangerouslySetInnerHTML={{ __html: t('Set segment as <strong>Next</strong>') }}></span>
 						</MenuItem>}
 					</ContextMenu>
@@ -63,12 +63,12 @@ export const SegmentContextMenu = translate()(class extends React.Component<Tran
 		}
 	}
 
-	onSetAsNextFromHere = (part, e) => {
+	onSetAsNextFromHere = (part: Part, e) => {
 		let offset = this.getTimePosition()
 		this.props.onSetNext(part, e, offset || 0)
 	}
 
-	onPlayFromHere = (part, e) => {
+	onPlayFromHere = (part: Part, e) => {
 		let offset = this.getTimePosition()
 		this.props.onSetNext(part, e, offset || 0, true)
 	}

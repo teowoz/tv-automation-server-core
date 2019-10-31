@@ -51,7 +51,7 @@ const PartOverview: React.SFC<IPartPropsHeader> = (props: IPartPropsHeader) => {
 				'has-played': (props.part.timings.startedPlayback !== undefined && props.part.timings.startedPlayback > 0 && (props.part.duration || 0) > 0)
 			})}
 				style={{
-					'width': (((Math.max(props.segmentLiveDurations && props.segmentLiveDurations[props.part._id] || 0, props.part.duration || props.part.expectedDuration || 0)) / (props.segmentDuration || 0)) * 100) + '%'
+					'width': (((Math.max(props.segmentLiveDurations && props.segmentLiveDurations[props.part._id] || 0, props.part.duration || props.part.part.expectedDuration || 0)) / (props.segmentDuration || 0)) * 100) + '%'
 				}}
 			>
 				{ props.isNext &&
@@ -62,7 +62,7 @@ const PartOverview: React.SFC<IPartPropsHeader> = (props: IPartPropsHeader) => {
 					<div className='rundown__overview__segment__part__live-line'
 						style={{
 							'left': (((getCurrentTime() - (props.part.timings.startedPlayback || 0)) /
-								(Math.max(props.segmentLiveDurations && props.segmentLiveDurations[props.part._id] || 0, props.part.duration || props.part.expectedDuration || 0))) * 100) + '%'
+								(Math.max(props.segmentLiveDurations && props.segmentLiveDurations[props.part._id] || 0, props.part.duration || props.part.part.expectedDuration || 0))) * 100) + '%'
 						}}>
 					</div>
 				}

@@ -63,7 +63,7 @@ export const DashboardPanel = translateWithTracker<IAdLibPanelProps & IDashboard
 	const currentPartIntance = props.rundown.currentPartInstanceId ? PartInstances.findOne(props.rundown.currentPartInstanceId) : undefined
 	const unfinishedPieces = _.groupBy(currentPartIntance ? Pieces.find({
 		rundownId: props.rundown._id,
-		partId: currentPartIntance.partId,
+		partId: currentPartIntance.part._id,
 		startedPlayback: {
 			$exists: true
 		},

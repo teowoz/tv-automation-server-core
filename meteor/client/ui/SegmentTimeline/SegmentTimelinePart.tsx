@@ -276,7 +276,7 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 							SegmentTimelinePart0.getLiveLineTimePadding(props.timeScale))
 					) || 0),
 					props.timingDurations.partDurations ?
-						(props.part.displayDuration || props.timingDurations.partDurations[props.part._id]) :
+						(props.part.part.displayDuration || props.timingDurations.partDurations[props.part._id]) :
 						0
 				)
 				: 0
@@ -291,7 +291,7 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 		const isDurationSettling = !!nextProps.rundown.active && !isLive && !!startedPlayback && !nextProps.part.duration
 
 		const liveDuration =
-			((isLive || isDurationSettling) && !nextProps.autoNextPart && !nextProps.part.autoNext) ?
+			((isLive || isDurationSettling) && !nextProps.autoNextPart && !nextProps.part.part.autoNext) ?
 				Math.max(
 					(
 						(startedPlayback && nextProps.timingDurations.partDurations &&
@@ -301,7 +301,7 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 									SegmentTimelinePart0.getLiveLineTimePadding(nextProps.timeScale))
 						) || 0),
 					nextProps.timingDurations.partDurations ?
-						(nextProps.part.displayDuration || nextProps.timingDurations.partDurations[nextProps.part._id]) :
+						(nextProps.part.part.displayDuration || nextProps.timingDurations.partDurations[nextProps.part._id]) :
 						0
 				)
 				: 0
@@ -421,7 +421,7 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 			'width': (Math.min(
 						Math.max(
 							0,
-							(this.props.livePosition || 0) + SegmentTimelinePart0.getLiveLineTimePadding(this.props.timeScale) - (this.props.part.expectedDuration || this.props.part.renderedDuration || 0)),
+							(this.props.livePosition || 0) + SegmentTimelinePart0.getLiveLineTimePadding(this.props.timeScale) - (this.props.part.part.expectedDuration || this.props.part.renderedDuration || 0)),
 				SegmentTimelinePart0.getLiveLineTimePadding(this.props.timeScale)
 					) * this.props.timeScale) + 'px'
 		}
@@ -437,25 +437,25 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 				<div className={ClassNames('segment-timeline__part', {
 					'live': this.state.isLive,
 					'next': this.state.isNext,
-					'invalid': this.props.part.invalid,
+					'invalid': this.props.part.part.invalid,
 
 					'duration-settling': this.state.isDurationSettling
 				})} data-obj-id={this.props.part._id}
 					id={SegmentTimelinePartElementId + this.props.part._id}
 					style={this.getLayerStyle()}
 				>
-					{this.props.part.invalid ? <div className='segment-timeline__part__invalid-cover'></div> : null}
+					{this.props.part.part.invalid ? <div className='segment-timeline__part__invalid-cover'></div> : null}
 
 					<div className={ClassNames('segment-timeline__part__nextline', { // This is the base, basic line
 						'auto-next': ((this.state.isNext && this.props.autoNextPart) || (!this.state.isNext && this.props.part.willProbablyAutoNext)),
-						'invalid': this.props.part.invalid,
+						'invalid': this.props.part.part.invalid,
 						'offset': !!this.props.rundown.nextTimeOffset
 					})}>
 						<div className={ClassNames('segment-timeline__part__nextline__label', {
 							'segment-timeline__part__nextline__label--thin': (this.props.autoNextPart || this.props.part.willProbablyAutoNext) && !this.state.isNext
 						})}>
 							{(
-								this.props.part.invalid ?
+								this.props.part.part.invalid ?
 									t('Invalid') :
 									<React.Fragment>
 										{((this.state.isNext && this.props.autoNextPart) || (!this.state.isNext && this.props.part.willProbablyAutoNext)) && t('Auto') + ' '}
@@ -467,7 +467,7 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 					{this.props.rundown.nextTimeOffset && this.state.isNext && // This is the off-set line
 						<div className={ClassNames('segment-timeline__part__nextline', {
 							'auto-next': this.props.part.willProbablyAutoNext,
-							'invalid': this.props.part.invalid
+							'invalid': this.props.part.part.invalid
 						})} style={{
 							'left': (this.props.relative ?
 								((this.props.rundown.nextTimeOffset / (this.getPartDuration() || 1) * 100) + '%') :
@@ -477,7 +477,7 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 								'segment-timeline__part__nextline__label--thin': (this.props.autoNextPart || this.props.part.willProbablyAutoNext) && !this.state.isNext
 							})}>
 								{(
-									this.props.part.invalid ?
+									this.props.part.part.invalid ?
 										t('Invalid') :
 									[
 										(this.props.autoNextPart || this.props.part.willProbablyAutoNext) && t('Auto') + ' ',
@@ -492,20 +492,20 @@ export const SegmentTimelinePart = translate()(withTiming<IProps, IState>((props
 							{this.props.livePosition} / {this.props.part.startsAt} / {((this.props.timingDurations || { partStartsAt: {} }).partStartsAt || {})[this.props.part._id]}
 						</div>
 					}
-					{this.state.isLive && !this.props.relative && !this.props.autoNextPart && !this.props.part.autoNext &&
+					{this.state.isLive && !this.props.relative && !this.props.autoNextPart && !this.props.part.part.autoNext &&
 						<div className='segment-timeline__part__future-shade' style={this.getFutureShadeStyle()}>
 						</div>
 					}
 					{this.renderTimelineOutputGroups(this.props.part)}
 					{this.props.isLastInSegment && <div className={ClassNames('segment-timeline__part__nextline', 'segment-timeline__part__nextline--endline', {
-						'auto-next': this.props.part.autoNext,
+						'auto-next': this.props.part.part.autoNext,
 						'is-next': this.state.isLive && (!this.props.isLastSegment && !this.props.isLastInSegment || !!this.props.rundown.nextPartInstanceId),
 						'show-end': isEndOfShow
 					})}>
 						<div className={ClassNames('segment-timeline__part__nextline__label', {
-							'segment-timeline__part__nextline__label--thin': (this.props.part.autoNext) && !this.state.isLive
+							'segment-timeline__part__nextline__label--thin': (this.props.part.part.autoNext) && !this.state.isLive
 						})}>
-							{this.props.part.autoNext && t('Auto') + ' '}
+							{this.props.part.part.autoNext && t('Auto') + ' '}
 							{this.state.isLive && t('Next')}
 							{!isEndOfShow && <div className='segment-timeline__part__nextline__label__carriage-return'>
 								<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 11.36 7.92'>

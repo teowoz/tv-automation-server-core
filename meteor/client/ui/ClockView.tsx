@@ -16,7 +16,7 @@ import { getCurrentTime, objectPathGet, extendMandadory } from '../../lib/lib'
 import { PieceIconContainer, PieceNameContainer } from './PieceIcons/PieceIcon'
 import { MeteorReactComponent } from '../lib/MeteorReactComponent'
 import { meteorSubscribe, PubSub } from '../../lib/api/pubsub'
-import { PartInstances, PartInstance, WrapPartToTemporaryInstance } from '../../lib/collections/PartInstances'
+import { PartInstances, PartInstance, WrapPartToTemporaryInstance, FindInstanceOrWrapToTemporary } from '../../lib/collections/PartInstances'
 
 interface SegmentUi extends Segment {
 	partInstances: Array<PartUi>
@@ -66,19 +66,20 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 			segments = _.map(rundown.getSegments(), (segment) => {
 				const displayDurationGroups: _.Dictionary<number> = {}
 				const partInstances = segment.getPartInstances()
-				const parts = _.map(segment.getParts(), part => partInstances.find(instance => instance.partId === part._id) || WrapPartToTemporaryInstance(part))
+				const parts = _.map(segment.getParts(), part => FindInstanceOrWrapToTemporary(partInstances, part))
 				let displayDuration = 0
 
 				return extendMandadory<Segment, SegmentUi>(segment, {
-					partInstances: _.map(parts, (part, index) => {
+					partInstances: _.map(parts, (partInstance, index) => {
+						const part = partInstance.part
 						if (part.displayDurationGroup && (
 							(displayDurationGroups[part.displayDurationGroup]) ||
 							// or there is a following member of this displayDurationGroup
-							(parts[index + 1] && parts[index + 1].displayDurationGroup === part.displayDurationGroup))) {
-							displayDurationGroups[part.displayDurationGroup] = (displayDurationGroups[part.displayDurationGroup] || 0) + ((part.expectedDuration || 0) - (part.duration || 0))
+							(parts[index + 1] && parts[index + 1].part.displayDurationGroup === part.displayDurationGroup))) {
+							displayDurationGroups[part.displayDurationGroup] = (displayDurationGroups[part.displayDurationGroup] || 0) + ((part.expectedDuration || 0) - (partInstance.duration || 0))
 							displayDuration = Math.max(0, Math.min(part.displayDuration || part.expectedDuration || 0, part.expectedDuration || 0) || displayDurationGroups[part.displayDurationGroup])
 						}
-						return extendMandadory<PartInstance, PartUi>(part, {
+						return extendMandadory<PartInstance, PartUi>(partInstance, {
 							pieces: [],
 							renderedDuration: part.expectedDuration ? 0 : displayDuration,
 							startsAt: 0,
@@ -128,7 +129,7 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 					}
 					let currentSegmentDuration = 0
 					if (currentPart) {
-						currentSegmentDuration += currentPart.renderedDuration || currentPart.expectedDuration || 0
+						currentSegmentDuration += currentPart.renderedDuration || currentPart.part.expectedDuration || 0
 						currentSegmentDuration += -1 * (currentPart.duration || 0)
 						if (!currentPart.duration && currentPart.timings.startedPlayback) {
 							currentSegmentDuration += -1 * (getCurrentTime() - currentPart.timings.startedPlayback)
@@ -172,7 +173,7 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 											{currentSegment!.name}
 										</div>
 										<div className='clocks-part-title clocks-part-title clocks-current-segment-title'>
-											<PieceNameContainer partSlug={currentPart.title} partId={currentPart._id} showStyleBaseId={rundown.showStyleBaseId} rundownId={rundown._id} />
+											<PieceNameContainer partSlug={currentPart.part.title} partId={currentPart._id} showStyleBaseId={rundown.showStyleBaseId} rundownId={rundown._id} />
 										</div>
 										<div className='clocks-current-segment-countdown clocks-segment-countdown'>
 											<Timediff time={currentSegmentDuration} />
@@ -191,15 +192,15 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 								</div>
 								<div className='clocks-bottom-top'>
 									<div className='clocks-part-title'>
-										{currentPart && currentPart.autoNext ?
+										{currentPart && currentPart.part.autoNext ?
 											<div style={{ display: 'inline-block', height: '18vh' }}>
 												<img style={{ height: '12vh', paddingTop: '2vh' }} src='/icons/auto-presenter-screen.svg' />
 											</div> : ''}
 										{nextSegment && nextSegment.name ? nextSegment.name.split(';')[0] : '_'}
 									</div>
 									<div className='clocks-part-title clocks-part-title'>
-										{nextPart && nextPart.title ?
-											<PieceNameContainer partSlug={nextPart.title} partId={nextPart._id} showStyleBaseId={rundown.showStyleBaseId} rundownId={rundown._id} />
+										{nextPart && nextPart.part.title ?
+											<PieceNameContainer partSlug={nextPart.part.title} partId={nextPart._id} showStyleBaseId={rundown.showStyleBaseId} rundownId={rundown._id} />
 											: '_'}
 									</div>
 								</div>

@@ -11,7 +11,7 @@ export namespace RundownUtils {
 
 	export function getSegmentDuration (parts: Array<PartUi>) {
 		return parts.reduce((memo, part) => {
-			return memo + (part.duration || part.expectedDuration || part.renderedDuration || 0)
+			return memo + (part.duration || part.part.expectedDuration || part.renderedDuration || 0)
 		}, 0)
 	}
 
@@ -116,7 +116,7 @@ export namespace RundownUtils {
 						(piece.renderedInPoint || 0) + (piece.renderedDuration || (
 							(part.duration !== undefined ?
 								(part.duration + (part.timings.playOffset || 0)) :
-								(partDuration || part.renderedDuration || part.expectedDuration || 0)
+								(partDuration || part.renderedDuration || part.part.expectedDuration || 0)
 									- (piece.renderedInPoint || 0))
 							)
 						) :
