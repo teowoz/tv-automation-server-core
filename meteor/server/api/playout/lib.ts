@@ -13,7 +13,8 @@ import {
 	Time,
 	clone,
 	literal,
-	asyncCollectionInsert
+	asyncCollectionInsert,
+	asyncCollectionInsertMany
 } from '../../../lib/lib'
 import { TimelineObjGeneric } from '../../../lib/collections/Timeline'
 import { loadCachedIngestSegment } from '../ingest/ingestCache'
@@ -22,6 +23,7 @@ import { updateSourceLayerInfinitesAfterPart } from './infinites'
 import { Studios } from '../../../lib/collections/Studios'
 import { DBSegment, Segments } from '../../../lib/collections/Segments'
 import { PartInstance, PartInstances } from '../../../lib/collections/PartInstances'
+import { PieceInstance, PieceInstances } from '../../../lib/collections/PieceInstances'
 
 /**
  * Reset the rundown:
@@ -210,12 +212,27 @@ export function setNextPart (
 				}
 			}))
 
+			const rawPieces = Pieces.find({
+				rundownId: rundown._id,
+				partId: nextPart._id
+			}).fetch()
+			const pieceInstances = _.map(rawPieces, piece => literal<PieceInstance>({
+				_id: `${newInstanceId}_${piece._id}`,
+				rundownId: rundown._id,
+				partInstanceId: newInstanceId,
+				piece: piece,
+				timings: {}
+			}))
+			ps.push(asyncCollectionInsertMany(PieceInstances, pieceInstances))
+
 			// Remove any instances which havent been taken
 			ps.push(asyncCollectionRemove(PartInstances, {
 				rundownId: rundown._id,
 				takeCount: { $gte: newTakeCount },
 				_id: { $ne: newInstanceId }
 			}))
+
+			// TODO - cleanup old pieceInstances
 		}
 
 		ps.push(asyncCollectionUpdate(Rundowns, rundown._id, {

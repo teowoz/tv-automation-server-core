@@ -17,6 +17,7 @@ import { IngestDataCache } from './IngestDataCache'
 import { ExpectedMediaItems } from './ExpectedMediaItems'
 import { createMongoCollection } from './lib'
 import { PartInstance, PartInstances } from './PartInstances'
+import { PieceInstance, PieceInstances } from './PieceInstances'
 
 export enum RundownHoldState {
 	NONE = 0,
@@ -227,7 +228,7 @@ export class Rundown implements DBRundown {
 	// 	})
 	// 	return timings
 	// }
-	fetchAllData (): PlayoutRundownData {
+	fetchAllPlayoutData (): PlayoutRundownData {
 
 		// Do fetches in parallell:
 		// const ps = [
@@ -259,31 +260,53 @@ export class Rundown implements DBRundown {
 		makePromise(() => {
 			return Pieces.find({ rundownId: this._id }).fetch()
 		}),
-		// makePromise(() => {
-		// 	let partInstances = _.map(this.getActivePartInstances(), (instance) => {
-		// 		// Override member function to use cached data instead:
-		// 		instance.part.getAllPieces = () => {
-		// 			return _.map(_.filter(pieces, (piece) => {
-		// 				return (
-		// 					piece.partId === instance._id
-		// 				)
-		// 			}), (part) => {
-		// 				return _.clone(part)
-		// 			})
-		// 		}
-		// 		return instance
-
-		// 	})
-		// 	let partInstancesMap = normalizeArray(partInstances, '_id')
-		// 	return { partInstances, partInstancesMap }
-		// })
 		makePromise(() => {
-			return this.getSelectedPartInstances()
-		})
-		)
+			const partInstanceIds = _.compact([
+				this.currentPartInstanceId,
+				this.previousPartInstanceId,
+				this.nextPartInstanceId
+			])
+
+			const pieceInstances = partInstanceIds.length ? PieceInstances.find({
+				rundownId: this._id,
+				partInstanceId: { $in: partInstanceIds }
+			}).fetch() : []
+
+			return pieceInstances
+		}),
+		makePromise(() => {
+			const getAllPieceInstances = () => {
+				return _.map(_.filter(selectedInstancePieces, (piece) => {
+					return (
+						piece.partInstanceId === this._id
+					)
+				}), (part) => {
+					return _.clone(part)
+				})
+			}
+
+			const partInstances = this.getSelectedPartInstances()
+			_.each(_.keys(partInstances), (key) => {
+				const partInstance = partInstances[key] as PartInstance | undefined
+				if (partInstance) {
+					// Override member function to use cached data instead:
+					partInstance.getAllPieceInstances = () => {
+						return _.map(_.filter(selectedInstancePieces, (piece) => {
+							return (
+								piece.partInstanceId === partInstance._id
+							)
+						}), (part) => {
+							return _.clone(part)
+						})
+					}
+				}
+			})
+			return partInstances
+		}))
 		// const { segments, segmentsMap } = r[0] as UnPromisify<typeof ps[0]>
 		// const { parts, partsMap } = r[1] as UnPromisify<typeof ps[1]>
 		const pieces = r[2]
+		const selectedInstancePieces = r[3]
 		// const { partInstances, partInstancesMap } = r[3] as UnPromisify<typeof ps[3]>
 
 		return {
@@ -291,7 +314,8 @@ export class Rundown implements DBRundown {
 			...r[0],
 			...r[1],
 			pieces,
-			...r[3],
+			...r[4],
+			selectedInstancePieces,
 		}
 	}
 	getNotes (): Array<RundownNote> {
@@ -325,6 +349,7 @@ export class Rundown implements DBRundown {
 }
 export interface PlayoutRundownData {
 	rundown: Rundown
+	// TODO - do we need all of this for playout?
 	segments: Array<Segment>
 	segmentsMap: {[id: string]: Segment | undefined}
 	parts: Array<Part>
@@ -334,6 +359,7 @@ export interface PlayoutRundownData {
 	currentPartInstance: PartInstance | undefined
 	nextPartInstance: PartInstance | undefined
 	previousPartInstance: PartInstance | undefined
+	selectedInstancePieces: Array<PieceInstance>
 }
 
 // export const Rundowns = createMongoCollection<Rundown>('rundowns', {transform: (doc) => applyClassToDocument(Rundown, doc) })

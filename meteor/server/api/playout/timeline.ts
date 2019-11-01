@@ -57,12 +57,12 @@ import { postProcessStudioBaselineObjects } from '../blueprints/postProcess'
 import { RecordedFiles } from '../../../lib/collections/RecordedFiles'
 import { generateRecordingTimelineObjs } from '../testTools'
 import { Part } from '../../../lib/collections/Parts'
-import { Piece } from '../../../lib/collections/Pieces'
 import { prefixAllObjectIds } from './lib'
 import { createPieceGroup, createPieceGroupFirstObject, getResolvedPiecesFromFullTimeline } from './pieces'
 import { PackageInfo } from '../../coreSystem'
 import { offsetTimelineEnableExpression } from '../../../lib/Rundown'
 import { PartInstance } from '../../../lib/collections/PartInstances'
+import { PieceInstance } from '../../../lib/collections/PieceInstances'
 
 /**
  * Updates the Timeline to reflect the state in the Rundown, Segments, Parts etc...
@@ -82,7 +82,7 @@ export const updateTimeline: (studioId: string, forceNowToTime?: Time, activeRun
 
 		const activeRundown = waitForPromise(getActiveRundown(studioId))
 		if (activeRundown) {
-			activeRundownData = activeRundown.fetchAllData()
+			activeRundownData = activeRundown.fetchAllPlayoutData()
 		}
 	} else {
 		activeRundownData = activeRundownData0
@@ -399,7 +399,9 @@ function setNowToTimeInObjects (timelineObjs: Array<TimelineObjGeneric>, now: Ti
 	})
 }
 
-function buildTimelineObjsForRundown (rundownData: PlayoutRundownData, baselineItems: RundownBaselineObj[]): (TimelineObjRundown & OnGenerateTimelineObj)[] {
+type PlayoutRundownData2 = Omit<PlayoutRundownData, 'pieces' | 'parts' | 'partsMap' | 'segments' | 'segmentsMap'>
+
+function buildTimelineObjsForRundown (rundownData: PlayoutRundownData2, baselineItems: RundownBaselineObj[]): (TimelineObjRundown & OnGenerateTimelineObj)[] {
 	let timelineObjs: Array<TimelineObjRundown & OnGenerateTimelineObj> = []
 	let currentPartGroup: TimelineObjRundown | undefined
 	let previousPartGroup: TimelineObjRundown | undefined
@@ -449,10 +451,9 @@ function buildTimelineObjsForRundown (rundownData: PlayoutRundownData, baselineI
 
 	// Currently playing:
 	if (currentPart) {
-
-		const currentPieces = currentPart.part.getAllPieces()
-		const currentInfinitePieces = currentPieces.filter(l => (l.infiniteMode && l.infiniteId && l.infiniteId !== l._id))
-		const currentNormalItems = currentPieces.filter(l => !(l.infiniteMode && l.infiniteId && l.infiniteId !== l._id))
+		const currentPieces = currentPart.getAllPieceInstances()
+		const currentInfinitePieces = currentPieces.filter(l => (l.piece.infiniteMode && l.infiniteId && l.infiniteId !== l._id))
+		const currentNormalItems = currentPieces.filter(l => !(l.piece.infiniteMode && l.infiniteId && l.infiniteId !== l._id))
 
 		let allowTransition = false
 
@@ -474,7 +475,7 @@ function buildTimelineObjsForRundown (rundownData: PlayoutRundownData, baselineI
 
 				// If a Piece is infinite, and continued in the new Part, then we want to add the Piece only there to avoid id collisions
 				const skipIds = currentInfinitePieces.map(l => l.infiniteId || '')
-				const previousPieces = previousPart.part.getAllPieces().filter(l => !l.infiniteId || skipIds.indexOf(l.infiniteId) < 0)
+				const previousPieces = previousPart.getAllPieceInstances().filter(l => !l.infiniteId || skipIds.indexOf(l.infiniteId) < 0)
 
 				const groupClasses: string[] = ['previous_part']
 				let prevObjs: TimelineObjRundown[] = [previousPartGroup]
@@ -500,13 +501,13 @@ function buildTimelineObjsForRundown (rundownData: PlayoutRundownData, baselineI
 
 		// any continued infinite lines need to skip the group, as they need a different start trigger
 		for (let piece of currentInfinitePieces) {
-			const infiniteGroup = createPartGroup(currentPart, { duration: piece.enable.duration || undefined })
+			const infiniteGroup = createPartGroup(currentPart, { duration: piece.piece.enable.duration || undefined })
 			infiniteGroup.id = getPartGroupId(piece._id) + '_infinite'
 			infiniteGroup.priority = 1
 
 			const groupClasses: string[] = ['current_part']
 			// If the previousPart also contains another segment of this infinite piece, then we label our new one as such
-			if (previousPart && previousPart.part.getAllPieces().filter(i => i.infiniteId && i.infiniteId === piece.infiniteId)) {
+			if (previousPart && previousPart.getAllPieceInstances().filter(i => i.infiniteId && i.infiniteId === piece.infiniteId)) {
 				groupClasses.push('continues_infinite')
 			}
 
@@ -564,7 +565,7 @@ function buildTimelineObjsForRundown (rundownData: PlayoutRundownData, baselineI
 
 			let toSkipIds = currentPieces.filter(i => i.infiniteId).map(i => i.infiniteId)
 
-			let nextItems = nextPart.part.getAllPieces()
+			let nextItems = nextPart.getAllPieceInstances()
 			nextItems = nextItems.filter(i => !i.infiniteId || toSkipIds.indexOf(i.infiniteId) === -1)
 
 			const groupClasses: string[] = ['next_part']
@@ -666,7 +667,7 @@ interface TransformTransitionProps {
 
 function transformPartIntoTimeline (
 	rundown: Rundown,
-	pieces: Piece[],
+	pieceInstances: PieceInstance[],
 	firstObjClasses: string[],
 	partGroup?: TimelineObjRundown,
 	transitionProps?: TransformTransitionProps,
@@ -677,43 +678,44 @@ function transformPartIntoTimeline (
 
 	const isHold = holdState === RundownHoldState.ACTIVE
 	const allowTransition = transitionProps && transitionProps.allowed && !isHold && holdState !== RundownHoldState.COMPLETE
-	const transition: Piece | undefined = allowTransition ? clone(pieces.find(i => !!i.isTransition)) : undefined
+	const transition: PieceInstance | undefined = allowTransition ? clone(pieceInstances.find(i => !!i.piece.isTransition)) : undefined
 	const transitionPieceDelay = transitionProps ? Math.max(0, (transitionProps.preroll || 0) - (transitionProps.transitionPreroll || 0)) : 0
 	const transitionContentsDelay = transitionProps ? (transitionProps.transitionPreroll || 0) - (transitionProps.preroll || 0) : 0
 
-	_.each(clone(pieces), (piece: Piece) => {
-		if (piece.disabled) return
-		if (piece.isTransition && (!allowTransition || isHold)) {
+	_.each(clone(pieceInstances), (pieceInstance: PieceInstance) => {
+		if (pieceInstance.disabled) return
+		if (pieceInstance.piece.isTransition && (!allowTransition || isHold)) {
 			return
 		}
 
-		if (piece.infiniteId && piece.infiniteId !== piece._id) {
-			piece._id = piece.infiniteId
+		if (pieceInstance.infiniteId && pieceInstance.infiniteId !== pieceInstance._id) {
+			pieceInstance._id = pieceInstance.infiniteId
 		}
 
 		if (
-			piece.content &&
-			piece.content.timelineObjects
+			pieceInstance.piece.content &&
+			pieceInstance.piece.content.timelineObjects
 		) {
-			let tos: TimelineObjectCoreExt[] = piece.content.timelineObjects
+			let tos: TimelineObjectCoreExt[] = pieceInstance.piece.content.timelineObjects
 
-			const isInfiniteContinuation = piece.infiniteId && piece.infiniteId !== piece._id
-			if (piece.enable.start === 0 && !isInfiniteContinuation) {
+			// TODO - this does nothing as the id is modified just above?
+			const isInfiniteContinuation = pieceInstance.infiniteId && pieceInstance.infiniteId !== pieceInstance._id
+			if (pieceInstance.piece.enable.start === 0 && !isInfiniteContinuation) {
 				// If timed absolute and there is a transition delay, then apply delay
-				if (!piece.isTransition && allowTransition && transition && !piece.adLibSourceId) {
+				if (!pieceInstance.piece.isTransition && allowTransition && transition && !pieceInstance.adLibSourceId) {
 					const transitionContentsDelayStr = transitionContentsDelay < 0 ? `- ${-transitionContentsDelay}` : `+ ${transitionContentsDelay}`
-					piece.enable.start = `#${getPieceGroupId(transition)}.start ${transitionContentsDelayStr}`
-				} else if (piece.isTransition && transitionPieceDelay) {
-					piece.enable.start = Math.max(0, transitionPieceDelay)
+					pieceInstance.piece.enable.start = `#${getPieceGroupId(transition.piece)}.start ${transitionContentsDelayStr}`
+				} else if (pieceInstance.piece.isTransition && transitionPieceDelay) {
+					pieceInstance.piece.enable.start = Math.max(0, transitionPieceDelay)
 				}
 			}
 
 			// create a piece group for the pieces and then place all of them there
-			const pieceGroup = createPieceGroup(piece, partGroup)
+			const pieceGroup = createPieceGroup(pieceInstance, partGroup)
 			timelineObjs.push(pieceGroup)
 
-			if (!piece.virtual) {
-				timelineObjs.push(createPieceGroupFirstObject(piece, pieceGroup, firstObjClasses))
+			if (!pieceInstance.piece.virtual) {
+				timelineObjs.push(createPieceGroupFirstObject(pieceInstance, pieceGroup, firstObjClasses))
 
 				_.each(tos, (o: TimelineObjectCoreExt) => {
 					fixTimelineId(o)
@@ -740,8 +742,8 @@ function transformPartIntoTimeline (
 						inGroup: partGroup ? pieceGroup.id : undefined,
 						rundownId: rundown._id,
 						objectType: TimelineObjType.RUNDOWN,
-						pieceId: piece._id,
-						infinitePieceId: piece.infiniteId
+						pieceId: pieceInstance._id,
+						infinitePieceId: pieceInstance.infiniteId // TODO - this id is pointless
 					})
 				})
 			}

@@ -16,7 +16,7 @@ import { getCurrentTime, objectPathGet, extendMandadory } from '../../lib/lib'
 import { PieceIconContainer, PieceNameContainer } from './PieceIcons/PieceIcon'
 import { MeteorReactComponent } from '../lib/MeteorReactComponent'
 import { meteorSubscribe, PubSub } from '../../lib/api/pubsub'
-import { PartInstances, PartInstance, WrapPartToTemporaryInstance, FindInstanceOrWrapToTemporary } from '../../lib/collections/PartInstances'
+import { PartInstances, PartInstance, WrapPartToTemporaryInstance, FindPartInstanceOrWrapToTemporary } from '../../lib/collections/PartInstances'
 
 interface SegmentUi extends Segment {
 	partInstances: Array<PartUi>
@@ -66,7 +66,7 @@ const ClockComponent = translate()(withTiming<RundownOverviewProps, RundownOverv
 			segments = _.map(rundown.getSegments(), (segment) => {
 				const displayDurationGroups: _.Dictionary<number> = {}
 				const partInstances = segment.getPartInstances()
-				const parts = _.map(segment.getParts(), part => FindInstanceOrWrapToTemporary(partInstances, part))
+				const parts = _.map(segment.getParts(), part => FindPartInstanceOrWrapToTemporary(partInstances, part))
 				let displayDuration = 0
 
 				return extendMandadory<Segment, SegmentUi>(segment, {

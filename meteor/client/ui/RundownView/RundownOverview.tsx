@@ -13,7 +13,7 @@ import { MeteorReactComponent } from '../../lib/MeteorReactComponent'
 import { RundownUtils } from '../../lib/rundown'
 import { Part } from '../../../lib/collections/Parts'
 import { PartInstanceExtended } from '../../../lib/Rundown'
-import { FindInstanceOrWrapToTemporary, PartInstance } from '../../../lib/collections/PartInstances'
+import { FindPartInstanceOrWrapToTemporary, PartInstance } from '../../../lib/collections/PartInstances'
 
 interface SegmentUi extends Segment {
 	partInstances: Array<PartUi>
@@ -130,7 +130,7 @@ withTracker<WithTiming<RundownOverviewProps>, RundownOverviewState, RundownOverv
 			const partInstances = segment.getPartInstances()
 			return extendMandadory<Segment, SegmentUi>(segment, {
 				partInstances: _.map(segment.getParts(), (part) => {
-					const instance = FindInstanceOrWrapToTemporary(partInstances, part)
+					const instance = FindPartInstanceOrWrapToTemporary(partInstances, part)
 					let sle = extendMandadory<PartInstance, PartInstanceExtended>(instance, {
 						pieces: [],
 						renderedDuration: 0,

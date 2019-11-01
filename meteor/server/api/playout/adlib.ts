@@ -6,19 +6,19 @@ import { SourceLayerType, PieceLifespan, getPieceGroupId } from 'tv-automation-s
 import { getCurrentTime, literal } from '../../../lib/lib'
 import { logger } from '../../../lib/logging'
 import { Rundowns, RundownHoldState, Rundown } from '../../../lib/collections/Rundowns'
-import { Timeline, TimelineObjGeneric, TimelineObjType } from '../../../lib/collections/Timeline'
+import { Timeline } from '../../../lib/collections/Timeline'
 import { AdLibPieces, AdLibPiece } from '../../../lib/collections/AdLibPieces'
 import { RundownBaselineAdLibPieces } from '../../../lib/collections/RundownBaselineAdLibPieces'
 import { Pieces, Piece } from '../../../lib/collections/Pieces'
-import { prefixAllObjectIds } from './lib'
-import { convertAdLibToPiece, getResolvedPieces } from './pieces'
+import { convertAdLibToPieceInstance, getResolvedPieces } from './pieces'
 import { cropInfinitesOnLayer, stopInfinitesRunningOnLayer } from './infinites'
 import { updateTimeline } from './timeline'
 // import { updatePartRanks } from '../rundown'
 import { rundownSyncFunction, RundownSyncFunctionPriority } from '../ingest/rundownInput'
+import { PartInstances } from '../../../lib/collections/PartInstances'
+import { PieceInstances } from '../../../lib/collections/PieceInstances'
 
 import { ServerPlayoutAPI } from './playout' // TODO - this should not be calling back like this
-import { PartInstances } from '../../../lib/collections/PartInstances'
 
 export namespace ServerPlayoutAdLibAPI {
 	export function pieceTakeNow (rundownId: string, partInstanceId: string, pieceId: string) {
@@ -26,6 +26,8 @@ export namespace ServerPlayoutAdLibAPI {
 			const rundown = Rundowns.findOne(rundownId)
 			if (!rundown) throw new Meteor.Error(404, `Rundown "${rundownId}" not found!`)
 			if (!rundown.active) throw new Meteor.Error(403, `Part AdLib-pieces can be only placed in an active rundown!`)
+
+			// TODO - this needs to handle a PieceInstance or a Piece being selected
 
 			const piece = Pieces.findOne({
 				_id: pieceId,
@@ -44,28 +46,12 @@ export namespace ServerPlayoutAdLibAPI {
 			const sourceL = showStyleBase.sourceLayers.find(i => i._id === piece.sourceLayerId)
 			if (sourceL && sourceL.type !== SourceLayerType.GRAPHICS) throw new Meteor.Error(403, `Piece "${pieceId}" is not a GRAPHICS item!`)
 
-			const newPiece = convertAdLibToPiece(piece, partInstance, false)
-			if (newPiece.content && newPiece.content.timelineObjects) {
-				newPiece.content.timelineObjects = prefixAllObjectIds(
-					_.compact(
-						_.map(newPiece.content.timelineObjects, (obj) => {
-							return literal<TimelineObjGeneric>({
-								...obj,
-								// @ts-ignore _id
-								_id: obj.id || obj._id,
-								studioId: '', // set later
-								objectType: TimelineObjType.RUNDOWN
-							})
-						})
-					),
-					newPiece._id
-				)
-			}
+			const newPieceInstance = convertAdLibToPieceInstance(piece, partInstance, false)
 
 			// Disable the original piece if from the same Part
 			if (piece.partId === partInstance.part._id) {
-				const pieces = getResolvedPieces(partInstance)
-				const resPiece = pieces.find(p => p._id === piece._id)
+				const pieceInstances = getResolvedPieces(partInstance)
+				const resPiece = pieceInstances.find(p => p.piece._id === piece._id) // TODO - this doesnt mean the content is the same..
 
 				if (piece.startedPlayback && piece.startedPlayback <= getCurrentTime()) {
 					if (
@@ -86,10 +72,10 @@ export namespace ServerPlayoutAdLibAPI {
 					hidden: true
 				}})
 			}
-			Pieces.insert(newPiece)
+			PieceInstances.insert(newPieceInstance)
 
-			cropInfinitesOnLayer(rundown, partInstance, newPiece)
-			stopInfinitesRunningOnLayer(rundown, partInstance, newPiece.sourceLayerId)
+			cropInfinitesOnLayer(rundown, partInstance, newPieceInstance)
+			stopInfinitesRunningOnLayer(rundown, partInstance, newPieceInstance.piece.sourceLayerId)
 			updateTimeline(rundown.studioId)
 		})
 	}
@@ -146,7 +132,7 @@ export namespace ServerPlayoutAdLibAPI {
 		})
 		if (!partInstance) throw new Meteor.Error(404, `PartInstance "${partInstanceId}" not found!`)
 
-		let newPiece = convertAdLibToPiece(adLibPiece, partInstance, queue)
+		let newPiece = convertAdLibToPieceInstance(adLibPiece, partInstance, queue)
 		Pieces.insert(newPiece)
 
 		if (queue) {
@@ -155,7 +141,7 @@ export namespace ServerPlayoutAdLibAPI {
 			Pieces.find({ rundownId: rundown._id, partId: orgPartId }).forEach(piece => {
 				// console.log(piece.name + ' has life span of ' + piece.infiniteMode)
 				if (piece.infiniteMode && piece.infiniteMode >= PieceLifespan.Infinite) {
-					let newPiece = convertAdLibToPiece(piece, part!, queue)
+					let newPiece = convertAdLibToPieceInstance(piece, part!, queue)
 					Pieces.insert(newPiece)
 				}
 			})

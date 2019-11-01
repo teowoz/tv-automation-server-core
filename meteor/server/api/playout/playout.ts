@@ -56,13 +56,14 @@ import {
 	deactivateRundown as libDeactivateRundown,
 	deactivateRundownInner
 } from './actions'
-import { PieceResolved, getOrderedPiece, getResolvedPieces, convertAdLibToPiece, convertPieceToAdLibPiece } from './pieces'
+import { PieceResolved, getOrderedPiece, getResolvedPieces, convertAdLibToPieceInstance, convertPieceToAdLibPiece } from './pieces'
 import { PackageInfo } from '../../coreSystem'
 import { areThereActiveRundownsInStudio } from './studio'
 import { updateSourceLayerInfinitesAfterPart, cropInfinitesOnLayer, stopInfinitesRunningOnLayer } from './infinites'
 import { rundownSyncFunction, RundownSyncFunctionPriority } from '../ingest/rundownInput'
 import { ServerPlayoutAdLibAPI } from './adlib'
 import { PartInstance, PartInstances } from '../../../lib/collections/PartInstances'
+import { PieceInstances, PieceInstance } from '../../../lib/collections/PieceInstances'
 
 export namespace ServerPlayoutAPI {
 	/**
@@ -206,7 +207,7 @@ export namespace ServerPlayoutAPI {
 			let timeOffset: number | null = rundown.nextTimeOffset || null
 
 			let firstTake = !rundown.startedPlayback
-			let rundownData = rundown.fetchAllData()
+			let rundownData = rundown.fetchAllPlayoutData()
 
 			let pBlueprint = makePromise(() => getBlueprintOfRundown(rundown))
 
@@ -353,32 +354,37 @@ export namespace ServerPlayoutAPI {
 				if (!previousPartInstance) throw new Meteor.Error(404, 'previousPart not found!')
 
 				// Make a copy of any item which is flagged as an 'infinite' extension
-				const itemsToCopy = previousPartInstance.part.getAllPieces().filter(i => i.extendOnHold)
-				itemsToCopy.forEach(piece => {
+				const itemsToCopy = previousPartInstance.getAllPieceInstances().filter(i => i.piece.extendOnHold)
+				itemsToCopy.forEach(pieceInstance => {
 					// mark current one as infinite
-					piece.infiniteId = piece._id
-					piece.infiniteMode = PieceLifespan.OutOnNextPart
-					ps.push(asyncCollectionUpdate(Pieces, piece._id, {
+					pieceInstance.piece.infiniteMode = PieceLifespan.OutOnNextPart
+					ps.push(asyncCollectionUpdate(PieceInstances, pieceInstance._id, {
 						$set: {
 							infiniteMode: PieceLifespan.OutOnNextPart,
-							infiniteId: piece._id,
+							infiniteId: pieceInstance._id,
 						}
 					}))
 
 					// make the extension
-					const newPiece: Piece = clone(piece)
-					newPiece.partId = takePartInstance.part._id
-					newPiece.enable = { start: 0 }
-					const content = newPiece.content as VTContent
-					if (content.fileName && content.sourceDuration && piece.startedPlayback) {
-						content.seek = Math.min(content.sourceDuration, getCurrentTime() - piece.startedPlayback)
+					const newPieceInstance: PieceInstance = literal<PieceInstance>({
+						_id: `${takePartInstance._id}_${pieceInstance.piece._id}_hold`,
+						rundownId: takePartInstance.rundownId,
+						partInstanceId: takePartInstance._id,
+						piece: {
+							...clone(pieceInstance.piece),
+							partId: takePartInstance.part._id,
+							enable: { start: 0 }
+						},
+						timings: {},
+						dynamicallyInserted: true
+					})
+					const content = newPieceInstance.piece.content as VTContent
+					if (content.fileName && content.sourceDuration && pieceInstance.timings.startedPlayback) {
+						content.seek = Math.min(content.sourceDuration, getCurrentTime() - pieceInstance.timings.startedPlayback)
 					}
-					newPiece.dynamicallyInserted = true
-					newPiece._id = piece._id + '_hold'
 
-					// This gets deleted once the nextpart is activated, so it doesnt linger for long
-					ps.push(asyncCollectionUpsert(Pieces, newPiece._id, newPiece))
-					rundownData.pieces.push(newPiece) // update the local collection
+					ps.push(asyncCollectionInsert(PieceInstances, newPieceInstance))
+					rundownData.selectedInstancePieces.push(newPieceInstance) // update the local collection
 
 				})
 			}
@@ -739,28 +745,28 @@ export namespace ServerPlayoutAPI {
 	/**
 	 * Triggered from Playout-gateway when a Piece has started playing
 	 */
-	export function onPiecePlaybackStarted (rundownId: string, pieceId: string, startedPlayback: Time) {
+	export function onPiecePlaybackStarted (rundownId: string, pieceInstanceId: string, startedPlayback: Time) {
 		check(rundownId, String)
-		check(pieceId, String)
+		check(pieceInstanceId, String)
 		check(startedPlayback, Number)
 
 		// TODO - confirm this is correct
 		return rundownSyncFunction(rundownId, RundownSyncFunctionPriority.Playout, () => {
 			// This method is called when an auto-next event occurs
-			const piece = Pieces.findOne({
-				_id: pieceId,
+			const pieceInstance = PieceInstances.findOne({
+				_id: pieceInstanceId,
 				rundownId: rundownId
 			})
-			if (!piece) throw new Meteor.Error(404, `Piece "${pieceId}" in rundown "${rundownId}" not found!`)
+			if (!pieceInstance) throw new Meteor.Error(404, `PieceInstance "${pieceInstanceId}" in rundown "${rundownId}" not found!`)
 
 			const isPlaying: boolean = !!(
-				piece.startedPlayback &&
-				!piece.stoppedPlayback
+				pieceInstance.timings.startedPlayback &&
+				!pieceInstance.timings.stoppedPlayback
 			)
 			if (!isPlaying) {
-				logger.info(`Playout reports piece "${pieceId}" has started playback on timestamp ${(new Date(startedPlayback)).toISOString()}`)
+				logger.info(`Playout reports pieceInstance "${pieceInstanceId}" has started playback on timestamp ${(new Date(startedPlayback)).toISOString()}`)
 
-				reportPieceHasStarted(piece, startedPlayback)
+				reportPieceHasStarted(pieceInstance, startedPlayback)
 
 				// We don't need to bother with an updateTimeline(), as this hasn't changed anything, but lets us accurately add started items when reevaluating
 			}
@@ -769,28 +775,28 @@ export namespace ServerPlayoutAPI {
 	/**
 	 * Triggered from Playout-gateway when a Piece has stopped playing
 	 */
-	export function onPiecePlaybackStopped (rundownId: string, pieceId: string, stoppedPlayback: Time) {
+	export function onPiecePlaybackStopped (rundownId: string, pieceInstanceId: string, stoppedPlayback: Time) {
 		check(rundownId, String)
-		check(pieceId, String)
+		check(pieceInstanceId, String)
 		check(stoppedPlayback, Number)
 
 		// TODO - confirm this is correct
 		return rundownSyncFunction(rundownId, RundownSyncFunctionPriority.Playout, () => {
 			// This method is called when an auto-next event occurs
-			const piece = Pieces.findOne({
-				_id: pieceId,
+			const pieceInstance = PieceInstances.findOne({
+				_id: pieceInstanceId,
 				rundownId: rundownId
 			})
-			if (!piece) throw new Meteor.Error(404, `Piece "${pieceId}" in rundown "${rundownId}" not found!`)
+			if (!pieceInstance) throw new Meteor.Error(404, `PieceInstance "${pieceInstanceId}" in rundown "${rundownId}" not found!`)
 
 			const isPlaying: boolean = !!(
-				piece.startedPlayback &&
-				!piece.stoppedPlayback
+				pieceInstance.timings.startedPlayback &&
+				!pieceInstance.timings.stoppedPlayback
 			)
 			if (isPlaying) {
-				logger.info(`Playout reports piece "${pieceId}" has stopped playback on timestamp ${(new Date(stoppedPlayback)).toISOString()}`)
+				logger.info(`Playout reports pieceInstance "${pieceInstanceId}" has stopped playback on timestamp ${(new Date(stoppedPlayback)).toISOString()}`)
 
-				reportPieceHasStopped(piece, stoppedPlayback)
+				reportPieceHasStopped(pieceInstance, stoppedPlayback)
 			}
 		})
 	}
@@ -912,7 +918,7 @@ export namespace ServerPlayoutAPI {
 
 					reportPartHasStarted(playingPartInstance, startedPlayback)
 
-					const rundownData = rundown.fetchAllData()
+					const rundownData = rundown.fetchAllPlayoutData()
 
 					afterTake(rundownData, playingPartInstance)
 				}
@@ -1022,14 +1028,14 @@ export namespace ServerPlayoutAPI {
 				if (!currentPartInstance) throw new Meteor.Error(501, `Current PartInstance "${rundown.currentPartInstanceId}" could not be found.`)
 
 				const lastPiece = convertPieceToAdLibPiece(lastPieces[0])
-				const newAdLibPiece = convertAdLibToPiece(lastPiece, currentPartInstance.part, false) // TODO eww..
+				const newAdLibPieceInstance = convertAdLibToPieceInstance(lastPiece, currentPartInstance, false)
 
-				Pieces.insert(newAdLibPiece)
+				PieceInstances.insert(newAdLibPieceInstance)
 
 				// logger.debug('adLibItemStart', newPiece)
 
-				cropInfinitesOnLayer(rundown, currentPart, newAdLibPiece)
-				stopInfinitesRunningOnLayer(rundown, currentPart, newAdLibPiece.sourceLayerId)
+				cropInfinitesOnLayer(rundown, currentPartInstance, newAdLibPieceInstance)
+				stopInfinitesRunningOnLayer(rundown, currentPartInstance, newAdLibPieceInstance.piece.sourceLayerId)
 
 				updateTimeline(rundown.studioId)
 			}
@@ -1227,28 +1233,33 @@ function beforeTake (rundownData: PlayoutRundownData, currentPartInstance: PartI
 			return
 		}
 		let ps: Array<Promise<any>> = []
-		const currentPieces = currentPartInstance.part.getAllPieces()
-		currentPieces.forEach((piece) => {
-			if (piece.overflows && typeof piece.enable.duration === 'number' && piece.enable.duration > 0 && piece.playoutDuration === undefined && piece.userDuration === undefined) {
+		const currentPieceInstances = currentPartInstance.getAllPieceInstances()
+		currentPieceInstances.forEach((pieceInstance) => {
+			if (pieceInstance.piece.overflows && typeof pieceInstance.piece.enable.duration === 'number' && pieceInstance.piece.enable.duration > 0 && pieceInstance.playoutDuration === undefined) {
 				// Subtract the amount played from the duration
-				const remainingDuration = Math.max(0, piece.enable.duration - ((piece.startedPlayback || currentPartInstance.timings.startedPlayback || getCurrentTime()) - getCurrentTime()))
+				const remainingDuration = Math.max(0, pieceInstance.piece.enable.duration - ((pieceInstance.timings.startedPlayback || currentPartInstance.timings.startedPlayback || getCurrentTime()) - getCurrentTime()))
 
 				if (remainingDuration > 0) {
 					// Clone an overflowing piece
-					let overflowedItem = literal<Piece>({
-						..._.omit(piece, 'startedPlayback', 'duration', 'overflows'),
-						_id: Random.id(),
-						partId: nextPartInstance.part._id, // TODO eww
-						enable: {
-							start: 0,
-							duration: remainingDuration,
-						},
+					const overflowedItem = literal<PieceInstance>({
+						_id: `${currentPartInstance._id}_${pieceInstance.piece._id}_ext`,
+						rundownId: currentPartInstance.rundownId,
+						partInstanceId: currentPartInstance._id,
 						dynamicallyInserted: true,
-						continuesRefId: piece._id,
+						continuesRefId: pieceInstance._id,
+						timings: {},
+						piece: {
+							...pieceInstance.piece,
+							enable: {
+								start: 0,
+								duration: remainingDuration,
+							},
+							overflows: false
+						}
 					})
 
-					ps.push(asyncCollectionInsert(Pieces, overflowedItem))
-					rundownData.pieces.push(overflowedItem) // update the cache
+					ps.push(asyncCollectionInsert(PieceInstances, overflowedItem))
+					rundownData.selectedInstancePieces.push(overflowedItem) // update the cache
 				}
 			}
 		})

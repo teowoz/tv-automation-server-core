@@ -1,5 +1,5 @@
 import * as _ from 'underscore'
-import { TransformedCollection } from '../typings/meteor'
+import { TransformedCollection, MongoSelector, FindOptions } from '../typings/meteor'
 import { applyClassToDocument, Time, registerCollection } from '../lib'
 import { Meteor } from 'meteor/meteor'
 import {
@@ -10,9 +10,9 @@ import {
 } from 'tv-automation-sofie-blueprints-integration'
 import { createMongoCollection } from './lib'
 import { DBPart, Part } from './Parts'
+import { PieceInstance, PieceInstances } from './PieceInstances'
+import { Pieces } from './Pieces'
 
-
-/** A "Line" in NRK Lingo. */
 export interface DBPartInstance extends IBlueprintPartInstance {
 	rundownId: string
 
@@ -20,16 +20,6 @@ export interface DBPartInstance extends IBlueprintPartInstance {
 	takeCount: number
 
 	part: DBPart
-
-	// /** Whether the part has started playback (the most recent time it was played).
-	//  * This is reset each time setAsNext is used.
-	//  * This is set from a callback from the playout gateway
-	//  */
-	// startedPlayback?: boolean
-	// /** Whether the part has stopped playback (the most recent time it was played & stopped).
-	//  * This is set from a callback from the playout gateway
-	//  */
-	// stoppedPlayback?: boolean
 
 	timings: PartInstanceTimings
 
@@ -59,6 +49,9 @@ export interface PartInstanceTimings extends IBlueprintPartInstanceTimings {
 }
 
 export class PartInstance implements DBPartInstance {
+	/** Whether this PartInstance is a temprorary wrapping of a Part */
+	public readonly isTemporary: boolean
+
 	// From IBlueprintPartInstance:
 	public part: Part
 	public _id: string
@@ -77,12 +70,45 @@ export class PartInstance implements DBPartInstance {
 	public dirty?: boolean // TODO - remove?
 	public reset?: boolean
 
-	constructor (document: DBPartInstance) {
+	constructor (document: DBPartInstance, isTemporary?: boolean) {
 		_.each(_.keys(document), (key) => {
 			this[key] = document[key]
 		})
+		this.isTemporary = isTemporary === true
 		this.part = new Part(document.part)
 	}
+	getPieceInstances (selector?: MongoSelector<PieceInstance>, options?: FindOptions) {
+		if (this.isTemporary) {
+			throw new Error('Not implemented') // TODO?
+			// const pieces = Pieces.find(
+			// 	{
+			// 		...selector,
+			// 		rundownId: this.rundownId,
+			// 		partId: this._id
+			// 	},
+			// 	{
+			// 		sort: { _rank: 1 },
+			// 		...options
+			// 	}
+			// ).fetch()
+		} else {
+			return PieceInstances.find(
+				{
+					...selector,
+					rundownId: this.rundownId,
+					partId: this._id
+				},
+				{
+					sort: { _rank: 1 },
+					...options
+				}
+			).fetch()
+		}
+	}
+	getAllPieceInstances () {
+		return this.getPieceInstances()
+	}
+
 	// getTimings () {
 	// 	// return a chronological list of timing events
 	// 	let events: Array<{time: Time, type: string, elapsed: Time}> = []
@@ -138,12 +164,13 @@ export function WrapPartToTemporaryInstance (part: DBPart): PartInstance {
 		_id: `${part._id}_tmp_instance`,
 		rundownId: part.rundownId,
 		segmentId: part.segmentId,
+		takeCount: -1, // TODO - is this any good?
 		part: new Part(part),
 		timings: {}
-	})
+	}, true)
 }
 
-export function FindInstanceOrWrapToTemporary (partInstances: PartInstance[], part: DBPart): PartInstance {
+export function FindPartInstanceOrWrapToTemporary (partInstances: PartInstance[], part: DBPart): PartInstance {
 	return partInstances.find(instance => instance.part._id === part._id) || WrapPartToTemporaryInstance(part)
 }
 

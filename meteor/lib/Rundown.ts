@@ -12,7 +12,7 @@ import { Segment } from './collections/Segments'
 import { Part, Parts } from './collections/Parts'
 import { Rundown } from './collections/Rundowns'
 import { ShowStyleBase } from './collections/ShowStyleBases'
-import { PartInstance, FindInstanceOrWrapToTemporary, PartInstances, WrapPartToTemporaryInstance } from './collections/PartInstances'
+import { PartInstance, FindPartInstanceOrWrapToTemporary, PartInstances, WrapPartToTemporaryInstance } from './collections/PartInstances'
 
 export const DEFAULT_DISPLAY_DURATION = 3000
 
@@ -123,7 +123,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 	// fetch all the parts for the segment
 	let partsE: Array<PartInstanceExtended> = []
 	const rawPartInstances = segment.getPartInstances()
-	const parts = _.map(segment.getParts(), part => FindInstanceOrWrapToTemporary(rawPartInstances, part))
+	const parts = _.map(segment.getParts(), part => FindPartInstanceOrWrapToTemporary(rawPartInstances, part))
 
 	if (parts.length > 0) {
 		if (checkFollowingSegment) {
