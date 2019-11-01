@@ -13,6 +13,7 @@ import { Part, Parts } from './collections/Parts'
 import { Rundown } from './collections/Rundowns'
 import { ShowStyleBase } from './collections/ShowStyleBases'
 import { PartInstance, FindPartInstanceOrWrapToTemporary, PartInstances, WrapPartToTemporaryInstance } from './collections/PartInstances'
+import { PieceInstance, PieceInstances } from './collections/PieceInstances'
 
 export const DEFAULT_DISPLAY_DURATION = 3000
 
@@ -49,7 +50,7 @@ export interface ISourceLayerExtended extends ISourceLayer {
 interface IPieceExtendedDictionary {
 	[key: string]: PieceExtended
 }
-export interface PieceExtended extends Piece {
+export interface PieceExtended extends PieceInstance {
 	/** Source layer that this piece belongs to */
 	sourceLayer?: ISourceLayerExtended
 	/** Output layer that this part uses */
@@ -142,13 +143,13 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 					sort: {} // TODO?
 				}) : undefined) || WrapPartToTemporaryInstance(rawFollowingPart)
 
-				let pieces = Pieces.find({
-					partId: firstFollowingPart.part._id
+				let pieceInstances = PieceInstances.find({
+					partInstanceId: firstFollowingPart._id
 				}).fetch()
 
 				followingPart = extendMandadory<PartInstance, PartInstanceExtended>(firstFollowingPart, {
-					pieces: _.map(pieces, (piece) => {
-						return extendMandadory<Piece, PieceExtended>(piece, {
+					pieces: _.map(pieceInstances, (piece) => {
+						return extendMandadory<PieceInstance, PieceExtended>(piece, {
 							// sourceLayer: ISourceLayerExtended,
 							// outputLayer: IOutputLayerExtended,
 							renderedInPoint: null,
@@ -243,30 +244,30 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 			// insert items into the timeline for resolution
 			_.each<PieceExtended>(partE.pieces, (piece) => {
 				partTimeline.push({
-					id: getPieceGroupId(piece),
+					id: getPieceGroupId(piece.piece),
 					enable: calculatePieceTimelineEnable(piece, TIMELINE_TEMP_OFFSET),
-					layer: piece.outputLayerId,
+					layer: piece.piece.outputLayerId,
 					content: {
 						id: piece._id
 					}
 				})
 				// find the target output layer
-				let outputLayer = outputLayers[piece.outputLayerId] as IOutputLayerExtended | undefined
+				let outputLayer = outputLayers[piece.piece.outputLayerId] as IOutputLayerExtended | undefined
 				piece.outputLayer = outputLayer
 
-				if (!piece.virtual && outputLayer) {
+				if (!piece.piece.virtual && outputLayer) {
 					// mark the output layer as used within this segment
-					if (sourceLayers[piece.sourceLayerId] && !sourceLayers[piece.sourceLayerId].isHidden) {
+					if (sourceLayers[piece.piece.sourceLayerId] && !sourceLayers[piece.piece.sourceLayerId].isHidden) {
 						outputLayer.used = true
 					}
 					// attach the sourceLayer to the output, if it hasn't been already
 					// find matching layer in the output
 					let sourceLayer = outputLayer.sourceLayers.find((el) => {
-						return el._id === piece.sourceLayerId
+						return el._id === piece.piece.sourceLayerId
 					})
 					// if the source has not yet been used on this output
 					if (!sourceLayer) {
-						sourceLayer = sourceLayers[piece.sourceLayerId]
+						sourceLayer = sourceLayers[piece.piece.sourceLayerId]
 						if (sourceLayer) {
 							sourceLayer = _.clone(sourceLayer)
 							let part = sourceLayer
@@ -357,9 +358,8 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 
 		// resolve the duration of a Piece to be used for display
 		const resolveDuration = (item: PieceExtended): number => {
-			const expectedDurationNumber = (typeof item.enable.duration === 'number' ? item.enable.duration || 0 : 0)
-			const userDurationNumber = (item.userDuration && typeof item.userDuration.duration === 'number' ? item.userDuration.duration || 0 : 0)
-			return (item.playoutDuration || userDurationNumber || item.renderedDuration || expectedDurationNumber)
+			const expectedDurationNumber = (typeof item.piece.enable.duration === 'number' ? item.piece.enable.duration || 0 : 0)
+			return (item.playoutDuration || item.renderedDuration || expectedDurationNumber)
 		}
 
 		_.each<PartInstanceExtended>(partsE, (part) => {
@@ -372,7 +372,7 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 				})
 
 				const itemsByLayer = _.groupBy(part.pieces, (item) => {
-					return item.outputLayerId + '_' + item.sourceLayerId
+					return item.piece.outputLayerId + '_' + item.piece.sourceLayerId
 				})
 				// check if the Pieces should be cropped (as should be the case if an item on a layer is placed after
 				// an infinite Piece) and limit the width of the labels so that they dont go under or over the next Piece.
@@ -383,13 +383,11 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 						const previousItem = sortedItems[i - 1]
 						if (previousItem.renderedInPoint !== null && currentItem.renderedInPoint !== null && previousItem.renderedDuration !== null && currentItem.renderedDuration !== null &&
 							previousItem.renderedInPoint !== undefined && currentItem.renderedInPoint !== undefined && previousItem.renderedDuration !== undefined && currentItem.renderedDuration !== undefined) {
-							if ((previousItem.renderedInPoint + previousItem.renderedDuration > currentItem.renderedInPoint) ||
-							 (previousItem.infiniteMode)
-								) {
+							if ((previousItem.renderedInPoint + previousItem.renderedDuration > currentItem.renderedInPoint) || previousItem.piece.infiniteMode) {
 								previousItem.renderedDuration = currentItem.renderedInPoint - previousItem.renderedInPoint
 								previousItem.cropped = true
-								if (previousItem.infiniteMode) {
-									previousItem.infiniteMode = PieceLifespan.Normal
+								if (previousItem.piece.infiniteMode) {
+									previousItem.piece.infiniteMode = PieceLifespan.Normal
 								}
 							}
 
@@ -407,18 +405,18 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 			_.each<PieceExtended>(followingPart.pieces, (piece) => {
 				// match outputs in following part, but do not mark as used
 				// we only care about outputs used in this segment
-				let outputLayer = outputLayers[piece.outputLayerId] as IOutputLayerExtended | undefined
+				let outputLayer = outputLayers[piece.piece.outputLayerId] as IOutputLayerExtended | undefined
 				piece.outputLayer = outputLayer
 
 				// find matching layer in the outputs
 				let sourceLayer = outputLayer && outputLayer.sourceLayers && outputLayer.sourceLayers.find((el) => {
-					return el._id === piece.sourceLayerId
+					return el._id === piece.piece.sourceLayerId
 				})
 
 				// if layer not found in output, add it to output
 				if (sourceLayer === undefined) {
 					if (outputLayer) {
-						sourceLayer = sourceLayers[piece.sourceLayerId]
+						sourceLayer = sourceLayers[piece.piece.sourceLayerId]
 						if (sourceLayer) {
 							// create a copy of the source layer to be attached inside the output.
 							sourceLayer = _.clone(sourceLayer)
@@ -491,41 +489,41 @@ export function offsetTimelineEnableExpression (val: SuperTimeline.Expression | 
 	}
 }
 
-export function calculatePieceTimelineEnable (piece: Piece, offset?: number): SuperTimeline.TimelineEnable {
+export function calculatePieceTimelineEnable (pieceInstance: PieceInstance, offset?: number): SuperTimeline.TimelineEnable {
 	let duration: SuperTimeline.Expression | undefined
 	let end: SuperTimeline.Expression | undefined
-	if (piece.playoutDuration !== undefined) {
-		duration = piece.playoutDuration
-	} else if (piece.userDuration !== undefined) {
-		duration = piece.userDuration.duration
-		end = piece.userDuration.end
+	if (pieceInstance.playoutDuration !== undefined) {
+		duration = pieceInstance.playoutDuration
+	// } else if (piece.userDuration !== undefined) {
+	// 	duration = piece.userDuration.duration
+	// 	end = piece.userDuration.end
 	} else {
-		duration = piece.enable.duration
-		end = piece.enable.end
+		duration = pieceInstance.piece.enable.duration
+		end = pieceInstance.piece.enable.end
 	}
 
 	// If we have an end and not a start, then use that with a duration
-	if ((end !== undefined || piece.enable.end !== undefined) && piece.enable.start === undefined) {
+	if ((end !== undefined || pieceInstance.piece.enable.end !== undefined) && pieceInstance.piece.enable.start === undefined) {
 		return {
-			end: end !== undefined ? end : offsetTimelineEnableExpression(piece.enable.end, offset),
+			end: end !== undefined ? end : offsetTimelineEnableExpression(pieceInstance.piece.enable.end, offset),
 			duration: duration
 		}
 	// Otherwise, if we have a start, then use that with either the end or duration
-	} else if (piece.enable.start !== undefined) {
+	} else if (pieceInstance.piece.enable.start !== undefined) {
 		let enable = literal<SuperTimeline.TimelineEnable>({})
 
-		if (piece.enable.start === 'now') {
+		if (pieceInstance.piece.enable.start === 'now') {
 			enable.start = 'now'
 		} else {
-			enable.start = offsetTimelineEnableExpression(piece.enable.start, offset)
+			enable.start = offsetTimelineEnableExpression(pieceInstance.piece.enable.start, offset)
 		}
 
 		if (duration !== undefined) {
 			enable.duration = duration
 		} else if (end !== undefined) {
 			enable.end = end
-		} else if (piece.enable.end !== undefined) {
-			enable.end = offsetTimelineEnableExpression(piece.enable.end, offset)
+		} else if (pieceInstance.piece.enable.end !== undefined) {
+			enable.end = offsetTimelineEnableExpression(pieceInstance.piece.enable.end, offset)
 		}
 		return enable
 	} else {

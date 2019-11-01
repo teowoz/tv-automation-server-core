@@ -107,8 +107,8 @@ export const SourceLayerItem = translate()(class extends React.Component<ISource
 			if (this.props.part && this.props.partStartsAt !== undefined) { //  && this.props.piece.renderedInPoint !== undefined && this.props.piece.renderedDuration !== undefined
 				let piece = this.props.piece
 
-				let inTransitionDuration = piece.transitions && piece.transitions.inTransition ? piece.transitions.inTransition.duration || 0 : 0
-				let outTransitionDuration = piece.transitions && piece.transitions.outTransition ? piece.transitions.outTransition.duration || 0 : 0
+				let inTransitionDuration = piece.piece.transitions && piece.piece.transitions.inTransition ? piece.piece.transitions.inTransition.duration || 0 : 0
+				let outTransitionDuration = piece.piece.transitions && piece.piece.transitions.outTransition ? piece.piece.transitions.outTransition.duration || 0 : 0
 
 				const inPoint = piece.renderedInPoint || 0
 				const duration = (Number.isFinite(piece.renderedDuration || 0)) ?
@@ -117,7 +117,7 @@ export const SourceLayerItem = translate()(class extends React.Component<ISource
 
 				const widthConstrictedMode = this.state.leftAnchoredWidth > 0 && this.state.rightAnchoredWidth > 0 && ((this.state.leftAnchoredWidth + this.state.rightAnchoredWidth) > this.state.elementWidth)
 
-				const nextIsTouching = !!(this.props.piece.cropped || (this.props.piece.enable.end && _.isString(this.props.piece.enable.end)))
+				const nextIsTouching = !!(this.props.piece.cropped || (this.props.piece.piece.enable.end && _.isString(this.props.piece.piece.enable.end)))
 
 				if (this.props.followLiveLine && this.props.isLiveLine) {
 					const liveLineHistoryWithMargin = this.props.liveLineHistorySize - 10
@@ -189,10 +189,10 @@ export const SourceLayerItem = translate()(class extends React.Component<ISource
 				let piece = this.props.piece
 
 				// let inTransitionDuration = piece.transitions && piece.transitions.inTransition ? piece.transitions.inTransition.duration || 0 : 0
-				let outTransitionDuration = piece.transitions && piece.transitions.outTransition ? piece.transitions.outTransition.duration || 0 : 0
+				let outTransitionDuration = piece.piece.transitions && piece.piece.transitions.outTransition ? piece.piece.transitions.outTransition.duration || 0 : 0
 
 				const inPoint = piece.renderedInPoint || 0
-				const duration = (piece.infiniteMode || piece.renderedDuration === 0) ? (this.props.partDuration - inPoint) : Math.min((piece.renderedDuration || 0), this.props.partDuration - inPoint)
+				const duration = (piece.piece.infiniteMode || piece.renderedDuration === 0) ? (this.props.partDuration - inPoint) : Math.min((piece.renderedDuration || 0), this.props.partDuration - inPoint)
 				const outPoint = inPoint + duration
 
 				// const widthConstrictedMode = this.state.leftAnchoredWidth > 0 && this.state.rightAnchoredWidth > 0 && ((this.state.leftAnchoredWidth + this.state.rightAnchoredWidth) > this.state.elementWidth)
@@ -214,14 +214,13 @@ export const SourceLayerItem = translate()(class extends React.Component<ISource
 	getItemDuration = (): number => {
 		let piece = this.props.piece
 
-		const expectedDurationNumber = (typeof piece.enable.duration === 'number' ? piece.enable.duration || 0 : 0)
-		const userDurationNumber = (piece.userDuration && typeof piece.userDuration.duration === 'number' ? piece.userDuration.duration || 0 : 0)
-		let itemDuration = Math.min(piece.playoutDuration || userDurationNumber || piece.renderedDuration || expectedDurationNumber || 0, this.props.partDuration - (piece.renderedInPoint || 0))
+		const expectedDurationNumber = (typeof piece.piece.enable.duration === 'number' ? piece.piece.enable.duration || 0 : 0)
+		let itemDuration = Math.min(piece.playoutDuration || piece.renderedDuration || expectedDurationNumber || 0, this.props.partDuration - (piece.renderedInPoint || 0))
 
 		if ((
-			(piece.infiniteMode !== undefined && piece.infiniteMode !== PieceLifespan.Normal) ||
-			(piece.enable.start !== undefined && piece.enable.end === undefined && piece.enable.duration === undefined)
-		) && !piece.cropped && !piece.playoutDuration && !piece.userDuration) {
+			(piece.piece.infiniteMode !== undefined && piece.piece.infiniteMode !== PieceLifespan.Normal) ||
+			(piece.piece.enable.start !== undefined && piece.piece.enable.end === undefined && piece.piece.enable.duration === undefined)
+		) && !piece.cropped && !piece.playoutDuration) {
 			itemDuration = this.props.partDuration - (piece.renderedInPoint || 0)
 			// console.log(piece.infiniteMode + ', ' + piece.infiniteId)
 		}
@@ -232,8 +231,8 @@ export const SourceLayerItem = translate()(class extends React.Component<ISource
 	getItemStyle (): { [key: string]: string } {
 		let piece = this.props.piece
 
-		let inTransitionDuration = piece.transitions && piece.transitions.inTransition ? piece.transitions.inTransition.duration || 0 : 0
-		let outTransitionDuration = piece.transitions && piece.transitions.outTransition ? piece.transitions.outTransition.duration || 0 : 0
+		let inTransitionDuration = piece.piece.transitions && piece.piece.transitions.inTransition ? piece.piece.transitions.inTransition.duration || 0 : 0
+		let outTransitionDuration = piece.piece.transitions && piece.piece.transitions.outTransition ? piece.piece.transitions.outTransition.duration || 0 : 0
 
 		// If this is a live line, take duration verbatim from SegmentLayerItemContainer with a fallback on expectedDuration.
 		// If not, as-run part "duration" limits renderdDuration which takes priority over MOS-import
@@ -474,17 +473,17 @@ export const SourceLayerItem = translate()(class extends React.Component<ISource
 
 			return (
 				<div className={ClassNames('segment-timeline__piece', typeClass, {
-					'with-in-transition': !this.props.relative && this.props.piece.transitions && this.props.piece.transitions.inTransition && (this.props.piece.transitions.inTransition.duration || 0) > 0,
-					'with-out-transition': !this.props.relative && this.props.piece.transitions && this.props.piece.transitions.outTransition && (this.props.piece.transitions.outTransition.duration || 0) > 0,
+					'with-in-transition': !this.props.relative && this.props.piece.piece.transitions && this.props.piece.piece.transitions.inTransition && (this.props.piece.piece.transitions.inTransition.duration || 0) > 0,
+					'with-out-transition': !this.props.relative && this.props.piece.piece.transitions && this.props.piece.piece.transitions.outTransition && (this.props.piece.piece.transitions.outTransition.duration || 0) > 0,
 
 					'hide-overflow-labels': this.state.leftAnchoredWidth > 0 && this.state.rightAnchoredWidth > 0 && ((this.state.leftAnchoredWidth + this.state.rightAnchoredWidth) > this.state.elementWidth),
 
-					'infinite': (this.props.piece.playoutDuration === undefined && this.props.piece.userDuration === undefined && this.props.piece.infiniteMode) as boolean, // 0 is a special value
-					'next-is-touching': !!(this.props.piece.cropped || (this.props.piece.enable.end && _.isString(this.props.piece.enable.end))),
+					'infinite': (this.props.piece.playoutDuration === undefined && this.props.piece.piece.infiniteMode) as boolean, // 0 is a special value
+					'next-is-touching': !!(this.props.piece.cropped || (this.props.piece.piece.enable.end && _.isString(this.props.piece.piece.enable.end))),
 
-					'source-missing': this.props.piece.status === RundownAPI.PieceStatusCode.SOURCE_MISSING || this.props.piece.status === RundownAPI.PieceStatusCode.SOURCE_NOT_SET,
-					'source-broken': this.props.piece.status === RundownAPI.PieceStatusCode.SOURCE_BROKEN,
-					'unknown-state': this.props.piece.status === RundownAPI.PieceStatusCode.UNKNOWN,
+					'source-missing': this.props.piece.piece.status === RundownAPI.PieceStatusCode.SOURCE_MISSING || this.props.piece.piece.status === RundownAPI.PieceStatusCode.SOURCE_NOT_SET,
+					'source-broken': this.props.piece.piece.status === RundownAPI.PieceStatusCode.SOURCE_BROKEN,
+					'unknown-state': this.props.piece.piece.status === RundownAPI.PieceStatusCode.UNKNOWN,
 					'disabled': this.props.piece.disabled
 				})}
 					data-obj-id={this.props.piece._id}
@@ -500,29 +499,29 @@ export const SourceLayerItem = translate()(class extends React.Component<ISource
 					{
 						DEBUG_MODE && (
 							<div className='segment-timeline__debug-info'>
-								{this.props.piece.enable.start} / {RundownUtils.formatTimeToTimecode(this.props.partDuration).substr(-5)} / {this.props.piece.renderedDuration ? RundownUtils.formatTimeToTimecode(this.props.piece.renderedDuration).substr(-5) : 'X'} / {typeof this.props.piece.enable.duration === 'number' ? RundownUtils.formatTimeToTimecode(this.props.piece.enable.duration).substr(-5) : ''}
+								{this.props.piece.piece.enable.start} / {RundownUtils.formatTimeToTimecode(this.props.partDuration).substr(-5)} / {this.props.piece.renderedDuration ? RundownUtils.formatTimeToTimecode(this.props.piece.renderedDuration).substr(-5) : 'X'} / {typeof this.props.piece.piece.enable.duration === 'number' ? RundownUtils.formatTimeToTimecode(this.props.piece.piece.enable.duration).substr(-5) : ''}
 							</div>
 						)
 					}
 					{
-						this.props.piece.transitions && this.props.piece.transitions.inTransition && (this.props.piece.transitions.inTransition.duration || 0) > 0 ? (
+						this.props.piece.piece.transitions && this.props.piece.piece.transitions.inTransition && (this.props.piece.piece.transitions.inTransition.duration || 0) > 0 ? (
 							<div className={ClassNames('segment-timeline__piece__transition', 'in', {
-								'mix': this.props.piece.transitions.inTransition.type === Transition.MIX,
-								'wipe': this.props.piece.transitions.inTransition.type === Transition.WIPE
+								'mix': this.props.piece.piece.transitions.inTransition.type === Transition.MIX,
+								'wipe': this.props.piece.piece.transitions.inTransition.type === Transition.WIPE
 							})}
 								style={{
-									'width': ((this.props.piece.transitions.inTransition.duration || 0) * this.props.timeScale).toString() + 'px'
+									'width': ((this.props.piece.piece.transitions.inTransition.duration || 0) * this.props.timeScale).toString() + 'px'
 								}} />
 						) : null
 					}
 					{
-						this.props.piece.transitions && this.props.piece.transitions.outTransition && (this.props.piece.transitions.outTransition.duration || 0) > 0 ? (
+						this.props.piece.piece.transitions && this.props.piece.piece.transitions.outTransition && (this.props.piece.piece.transitions.outTransition.duration || 0) > 0 ? (
 							<div className={ClassNames('segment-timeline__piece__transition', 'out', {
-								'mix': this.props.piece.transitions.outTransition.type === Transition.MIX,
-								'wipe': this.props.piece.transitions.outTransition.type === Transition.WIPE
+								'mix': this.props.piece.piece.transitions.outTransition.type === Transition.MIX,
+								'wipe': this.props.piece.piece.transitions.outTransition.type === Transition.WIPE
 							})}
 								style={{
-									'width': ((this.props.piece.transitions.outTransition.duration || 0) * this.props.timeScale).toString() + 'px'
+									'width': ((this.props.piece.piece.transitions.outTransition.duration || 0) * this.props.timeScale).toString() + 'px'
 								}} />
 						) : null
 					}

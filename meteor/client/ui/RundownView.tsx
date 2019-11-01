@@ -1399,9 +1399,9 @@ class extends MeteorReactComponent<Translated<IProps & ITrackedProps>, IState> {
 	}
 
 	onSelectPiece = (piece: PieceUi, e: React.MouseEvent<HTMLDivElement>) => {
-		if (piece && piece.content && (piece.content as VTContent).editable &&
-			((((piece.content as VTContent).editable as VTEditableParameters).editorialDuration !== undefined) ||
-			((piece.content as VTContent).editable as VTEditableParameters).editorialStart !== undefined)) {
+		if (piece && piece.piece.content && (piece.piece.content as VTContent).editable &&
+			((((piece.piece.content as VTContent).editable as VTEditableParameters).editorialDuration !== undefined) ||
+			((piece.piece.content as VTContent).editable as VTEditableParameters).editorialStart !== undefined)) {
 			this.setState({
 				isClipTrimmerOpen: true,
 				selectedPiece: piece

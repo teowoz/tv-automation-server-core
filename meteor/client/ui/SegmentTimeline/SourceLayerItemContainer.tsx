@@ -62,10 +62,10 @@ export const SourceLayerItemContainer = class extends MeteorReactComponent<IProp
 
 			switch (this.props.piece.sourceLayer.type) {
 				case SourceLayerType.VT:
-					objId = (piece.content as VTContent).fileName.toUpperCase()
+					objId = (piece.piece.content as VTContent).fileName.toUpperCase()
 					break
 				case SourceLayerType.LIVE_SPEAK:
-					objId = (piece.content as LiveSpeakContent).fileName.toUpperCase()
+					objId = (piece.piece.content as LiveSpeakContent).fileName.toUpperCase()
 					break
 			}
 
@@ -100,12 +100,12 @@ export const SourceLayerItemContainer = class extends MeteorReactComponent<IProp
 			if (props.isLiveLine) {
 				// Check in Timeline collection for any changes to the related object
 				// TODO - this query appears to be unable to load any data
-				let timelineObj = Timeline.findOne({ id: getPieceGroupId(props.piece) })
+				let timelineObj = Timeline.findOne({ id: getPieceGroupId(props.piece.piece) })
 
 				if (timelineObj) {
 					let pieceCopy = (_.clone(overrides.piece || props.piece) as PieceUi)
 
-					pieceCopy.enable = timelineObj.enable
+					pieceCopy.piece.enable = timelineObj.enable
 					if (_.isNumber(timelineObj.enable.start)) { // this is a normal absolute trigger value
 						pieceCopy.renderedInPoint = timelineObj.enable.start
 					} else if (timelineObj.enable.start === 'now') { // this is a special absolute trigger value
@@ -134,11 +134,11 @@ export const SourceLayerItemContainer = class extends MeteorReactComponent<IProp
 			// Check item status
 			if (props.piece.sourceLayer) {
 
-				const { metadata, status } = checkPieceContentStatus(props.piece, props.piece.sourceLayer, props.rundown.getStudio().settings)
-				if (status !== props.piece.status || metadata) {
+				const { metadata, status } = checkPieceContentStatus(props.piece.piece, props.piece.sourceLayer, props.rundown.getStudio().settings)
+				if (status !== props.piece.piece.status || metadata) {
 					let pieceCopy = (_.clone(overrides.piece || props.piece) as PieceUi)
 
-					pieceCopy.status = status
+					pieceCopy.piece.status = status
 					pieceCopy.contentMetaData = metadata
 
 					overrides.piece = _.extend(overrides.piece || {}, pieceCopy)

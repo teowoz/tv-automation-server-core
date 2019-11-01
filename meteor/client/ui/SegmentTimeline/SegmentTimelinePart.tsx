@@ -89,14 +89,14 @@ class SourceLayer extends React.Component<ISourceLayerProps> {
 		if (this.props.layer.pieces !== undefined) {
 			return _.chain(this.props.layer.pieces.filter((piece) => {
 				// filter only pieces belonging to this part
-				return (piece.partId === this.props.part._id) ?
+				return (piece.partInstanceId === this.props.part._id) ?
 					// filter only pieces, that have not been hidden from the UI
-					(piece.hidden !== true) &&
-					(piece.virtual !== true)
+					(piece.piece.hidden !== true) &&
+					(piece.piece.virtual !== true)
 					: false
 			}))
 			.sortBy((it) => it.renderedInPoint)
-			.sortBy((it) => it.infiniteMode)
+			.sortBy((it) => it.piece.infiniteMode)
 			.sortBy((it) => it.cropped)
 			.map((piece) => {
 				return (
