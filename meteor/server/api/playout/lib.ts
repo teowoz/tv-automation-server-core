@@ -35,6 +35,14 @@ export function resetRundown (rundown: Rundown) {
 		dynamicallyInserted: true
 	})
 
+	PartInstances.update({
+		rundownId: rundown._id
+	}, {
+		$set: {
+			reset: true
+		}
+	})
+
 	// Parts.remove({
 	// 	rundownId: rundown._id,
 	// 	dynamicallyInserted: true
@@ -165,16 +173,7 @@ export function setNextPart (
 	setManually?: boolean,
 	nextTimeOffset?: number | undefined
 ) {
-	let shouldResetNextPartInstance = setManually
-	const { nextPartInstance } = rundown.getSelectedPartInstances()
-	if (rundown.currentPartInstanceId && rundown.nextPartInstanceId && rundown.currentPartInstanceId === rundown.nextPartInstanceId) {
-		// If current and next are the same, then we need a new instance
-		shouldResetNextPartInstance = true
-	} else if (!shouldResetNextPartInstance && nextPart) {
-		if (nextPartInstance && nextPartInstance.part._id === nextPart._id) {
-			shouldResetNextPartInstance = true
-		}
-	}
+	const { currentPartInstance, nextPartInstance } = rundown.getSelectedPartInstances()
 
 	if (nextPart && nextPart.invalid) {
 		throw new Meteor.Error(400, 'Part is marked as invalid, cannot set as next.')
@@ -189,14 +188,6 @@ export function setNextPart (
 
 	let ps: Array<Promise<any>> = []
 
-	// Remove any instances which havent been taken
-	if (shouldResetNextPartInstance || !nextPartInstance) {
-		ps.push(asyncCollectionRemove(PartInstances, {
-			rundownId: rundown._id,
-			'timings.take': { $exists: false }
-		}))
-	}
-
 	if (nextPart) {
 		ps.push(resetPart(nextPart))
 
@@ -207,14 +198,23 @@ export function setNextPart (
 			newInstanceId = nextPartInstance._id
 		} else {
 			newInstanceId = `${nextPart._id}_${Random.id()}`
+			const newTakeCount = currentPartInstance ? currentPartInstance.takeCount + 1 : 0 // Increment
 			ps.push(asyncCollectionInsert(PartInstances, {
 				_id: newInstanceId,
+				takeCount: newTakeCount,
 				rundownId: rundown._id,
 				segmentId: nextPart.segmentId,
 				part: nextPart,
 				timings: {
 					next: getCurrentTime()
 				}
+			}))
+
+			// Remove any instances which havent been taken
+			ps.push(asyncCollectionRemove(PartInstances, {
+				rundownId: rundown._id,
+				takeCount: { $gte: newTakeCount },
+				_id: { $ne: newInstanceId }
 			}))
 		}
 
@@ -230,6 +230,12 @@ export function setNextPart (
 		rundown.nextTimeOffset = nextTimeOffset || null
 
 	} else {
+		// Remove any instances which havent been taken
+		ps.push(asyncCollectionRemove(PartInstances, {
+			rundownId: rundown._id,
+			'timings.take': { $exists: false }
+		}))
+
 		ps.push(asyncCollectionUpdate(Rundowns, rundown._id, {
 			$set: literal<Partial<Rundown>>({
 				nextPartInstanceId: null,

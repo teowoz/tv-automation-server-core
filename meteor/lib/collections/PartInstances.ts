@@ -16,6 +16,9 @@ import { DBPart, Part } from './Parts'
 export interface DBPartInstance extends IBlueprintPartInstance {
 	rundownId: string
 
+	/** Rank of the take that this PartInstance belongs to */
+	takeCount: number
+
 	part: DBPart
 
 	// /** Whether the part has started playback (the most recent time it was played).
@@ -37,8 +40,8 @@ export interface DBPartInstance extends IBlueprintPartInstance {
 	/** The end state of the previous part, to allow for bits of this to part to be based on what the previous did/was */
 	previousPartEndState?: PartEndState
 
-	/** if the part is inserted after another (for adlibbing) */
-	afterPart?: string
+	// /** if the part is inserted after another (for adlibbing) */
+	// afterPartInstance?: string
 	/** if the part was dunamically inserted (adlib) */
 	dynamicallyInserted?: boolean
 
@@ -59,6 +62,7 @@ export class PartInstance implements DBPartInstance {
 	// From IBlueprintPartInstance:
 	public part: Part
 	public _id: string
+	public takeCount: number
 	public segmentId: string
 	public rundownId: string
 	public timings: PartInstanceTimings
@@ -67,7 +71,7 @@ export class PartInstance implements DBPartInstance {
 	// public stoppedPlayback?: boolean
 	public duration?: number
 	public previousPartEndState?: PartEndState
-	public afterPart?: string
+	// public afterPartInstance?: string
 	public dynamicallyInserted?: boolean
 	public runtimeArguments?: BlueprintRuntimeArguments
 	public dirty?: boolean // TODO - remove?

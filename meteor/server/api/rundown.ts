@@ -126,16 +126,16 @@ export function afterRemoveSegments (rundownId: string, segmentIds: string[]) {
  * @param removedParts The parts that have been removed
  */
 export function afterRemoveParts (rundownId: string, removedParts: DBPart[]) {
-	saveIntoDb(Parts, {
-		rundownId: rundownId,
-		dynamicallyInserted: true,
-		afterPart: { $in: _.map(removedParts, p => p._id) }
-	}, [], {
-		afterRemoveAll (parts) {
-			// Do the same for any affected dynamicallyInserted Parts
-			afterRemoveParts(rundownId, parts)
-		}
-	})
+	// saveIntoDb(Parts, {
+	// 	rundownId: rundownId,
+	// 	dynamicallyInserted: true,
+	// 	afterPart: { $in: _.map(removedParts, p => p._id) }
+	// }, [], {
+	// 	afterRemoveAll (parts) {
+	// 		// Do the same for any affected dynamicallyInserted Parts
+	// 		afterRemoveParts(rundownId, parts)
+	// 	}
+	// })
 
 	// Clean up all the db parts that belong to the removed Parts
 	// TODO - is there anything else to remove?
@@ -158,113 +158,113 @@ export function afterRemoveParts (rundownId: string, removedParts: DBPart[]) {
 		UpdateNext.ensureNextPartIsValid(rundown)
 	}
 }
-/**
- * Update the ranks of all parts.
- * Uses the ranks to determine order within segments, and then updates part ranks based on segment ranks.
- * Adlib/dynamic parts get assigned ranks based on the rank of what they are told to be after
- * @param rundownId
- */
-export function updatePartRanks (rundownId: string): Array<Part> {
-	const allSegments = Segments.find({ rundownId: rundownId }, { sort: { _rank: 1 } }).fetch()
-	const allParts = Parts.find({ rundownId: rundownId }, { sort: { _rank: 1 } }).fetch()
+// /**
+//  * Update the ranks of all parts.
+//  * Uses the ranks to determine order within segments, and then updates part ranks based on segment ranks.
+//  * Adlib/dynamic parts get assigned ranks based on the rank of what they are told to be after
+//  * @param rundownId
+//  */
+// export function updatePartRanks (rundownId: string): Array<Part> {
+// 	const allSegments = Segments.find({ rundownId: rundownId }, { sort: { _rank: 1 } }).fetch()
+// 	const allParts = Parts.find({ rundownId: rundownId }, { sort: { _rank: 1 } }).fetch()
 
-	logger.debug(`updatePartRanks (${allParts.length} parts, ${allSegments.length} segments)`)
+// 	logger.debug(`updatePartRanks (${allParts.length} parts, ${allSegments.length} segments)`)
 
-	const rankedParts: Array<Part> = []
-	const partsToPutAfter: {[id: string]: Array<Part>} = {}
+// 	const rankedParts: Array<Part> = []
+// 	const partsToPutAfter: {[id: string]: Array<Part>} = {}
 
-	_.each(allParts, (part) => {
-		if (part.afterPart) {
-			if (!partsToPutAfter[part.afterPart]) partsToPutAfter[part.afterPart] = []
-			partsToPutAfter[part.afterPart].push(part)
-		} else {
-			rankedParts.push(part)
-		}
-	})
+// 	_.each(allParts, (part) => {
+// 		if (part.afterPart) {
+// 			if (!partsToPutAfter[part.afterPart]) partsToPutAfter[part.afterPart] = []
+// 			partsToPutAfter[part.afterPart].push(part)
+// 		} else {
+// 			rankedParts.push(part)
+// 		}
+// 	})
 
-	// Sort the parts by segment, then rank
-	const segmentRanks: {[segmentId: string]: number} = {}
-	_.each(allSegments, seg => {
-		segmentRanks[seg._id] = seg._rank
-	})
-	rankedParts.sort((a, b) => {
-		let compareRanks = (ar: number, br: number) => {
-			if (ar === br) {
-				return 0
-			} else if (ar < br) {
-				return -1
-			} else {
-				return 1
-			}
-		}
+// 	// Sort the parts by segment, then rank
+// 	const segmentRanks: {[segmentId: string]: number} = {}
+// 	_.each(allSegments, seg => {
+// 		segmentRanks[seg._id] = seg._rank
+// 	})
+// 	rankedParts.sort((a, b) => {
+// 		let compareRanks = (ar: number, br: number) => {
+// 			if (ar === br) {
+// 				return 0
+// 			} else if (ar < br) {
+// 				return -1
+// 			} else {
+// 				return 1
+// 			}
+// 		}
 
-		if (a.segmentId === b.segmentId) {
-			return compareRanks(a._rank, b._rank)
-		} else {
-			const aRank = segmentRanks[a.segmentId] || -1
-			const bRank = segmentRanks[b.segmentId] || -1
-			return compareRanks(aRank, bRank)
-		}
-	})
+// 		if (a.segmentId === b.segmentId) {
+// 			return compareRanks(a._rank, b._rank)
+// 		} else {
+// 			const aRank = segmentRanks[a.segmentId] || -1
+// 			const bRank = segmentRanks[b.segmentId] || -1
+// 			return compareRanks(aRank, bRank)
+// 		}
+// 	})
 
-	let ps: Array<Promise<any>> = []
-	// Ensure that the parts are all correctly rannnnked
-	_.each(rankedParts, (part, newRank) => {
-		if (part._rank !== newRank) {
-			ps.push(asyncCollectionUpdate(Parts, part._id, { $set: { _rank: newRank } }))
-			// Update in place, for the upcoming algorithm
-			part._rank = newRank
-		}
-	})
-	logger.debug(`updatePartRanks: ${ps.length} parts updated`)
+// 	let ps: Array<Promise<any>> = []
+// 	// Ensure that the parts are all correctly rannnnked
+// 	_.each(rankedParts, (part, newRank) => {
+// 		if (part._rank !== newRank) {
+// 			ps.push(asyncCollectionUpdate(Parts, part._id, { $set: { _rank: newRank } }))
+// 			// Update in place, for the upcoming algorithm
+// 			part._rank = newRank
+// 		}
+// 	})
+// 	logger.debug(`updatePartRanks: ${ps.length} parts updated`)
 
-	let hasAddedAnything = true
-	while (hasAddedAnything) {
-		hasAddedAnything = false
+// 	let hasAddedAnything = true
+// 	while (hasAddedAnything) {
+// 		hasAddedAnything = false
 
-		_.each(partsToPutAfter, (dynamicParts, partId) => {
+// 		_.each(partsToPutAfter, (dynamicParts, partId) => {
 
-			let partBefore: Part | null = null
-			let partAfter: Part | null = null
-			let insertI = -1
-			_.each(rankedParts, (part, i) => {
-				if (part._id === partId) {
-					partBefore = part
+// 			let partBefore: Part | null = null
+// 			let partAfter: Part | null = null
+// 			let insertI = -1
+// 			_.each(rankedParts, (part, i) => {
+// 				if (part._id === partId) {
+// 					partBefore = part
 
-					insertI = i + 1
-				} else if (partBefore && !partAfter) {
-					partAfter = part
+// 					insertI = i + 1
+// 				} else if (partBefore && !partAfter) {
+// 					partAfter = part
 
-				}
-			})
+// 				}
+// 			})
 
-			if (partBefore) {
+// 			if (partBefore) {
 
-				if (insertI !== -1) {
-					_.each(dynamicParts, (dynamicPart, i) => {
-						const newRank = getRank(partBefore, partAfter, i, dynamicParts.length)
+// 				if (insertI !== -1) {
+// 					_.each(dynamicParts, (dynamicPart, i) => {
+// 						const newRank = getRank(partBefore, partAfter, i, dynamicParts.length)
 
-						if (dynamicPart._rank !== newRank) {
-							dynamicPart._rank = newRank
-							ps.push(asyncCollectionUpdate(Parts, dynamicPart._id, { $set: { _rank: dynamicPart._rank } }))
-						}
+// 						if (dynamicPart._rank !== newRank) {
+// 							dynamicPart._rank = newRank
+// 							ps.push(asyncCollectionUpdate(Parts, dynamicPart._id, { $set: { _rank: dynamicPart._rank } }))
+// 						}
 
-						rankedParts.splice(insertI, 0, dynamicPart)
-						insertI++
-						hasAddedAnything = true
-					})
-				}
-				delete partsToPutAfter[partId]
-			} else {
-				// TODO - part is invalid and should be deleted/warned about
-			}
-		})
-	}
+// 						rankedParts.splice(insertI, 0, dynamicPart)
+// 						insertI++
+// 						hasAddedAnything = true
+// 					})
+// 				}
+// 				delete partsToPutAfter[partId]
+// 			} else {
+// 				// TODO - part is invalid and should be deleted/warned about
+// 			}
+// 		})
+// 	}
 
-	waitForPromiseAll(ps)
+// 	waitForPromiseAll(ps)
 
-	return rankedParts
-}
+// 	return rankedParts
+// }
 
 export namespace ServerRundownAPI {
 	export function removeRundown (rundownId: string) {

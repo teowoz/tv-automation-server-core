@@ -408,8 +408,8 @@ function restoreFromRundownSnapshot (snapshot: RundownSnapshot) {
 	}
 
 	snapshot.rundown.active					= (dbRundown ? dbRundown.active : false)
-	snapshot.rundown.currentPartId		= (dbRundown ? dbRundown.currentPartId : null)
-	snapshot.rundown.nextPartId			= (dbRundown ? dbRundown.nextPartId : null)
+	snapshot.rundown.currentPartInstanceId		= (dbRundown ? dbRundown.currentPartInstanceId : null)
+	snapshot.rundown.nextPartInstanceId			= (dbRundown ? dbRundown.nextPartInstanceId : null)
 	snapshot.rundown.notifiedCurrentPlayingPartExternalId = (dbRundown ? dbRundown.notifiedCurrentPlayingPartExternalId : undefined)
 
 	const studios = Studios.find().fetch()

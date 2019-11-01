@@ -56,7 +56,7 @@ import {
 	deactivateRundown as libDeactivateRundown,
 	deactivateRundownInner
 } from './actions'
-import { PieceResolved, getOrderedPiece, getResolvedPieces, convertAdLibToPiece, convertPieceToAdLibPiece, resolveActivePieces } from './pieces'
+import { PieceResolved, getOrderedPiece, getResolvedPieces, convertAdLibToPiece, convertPieceToAdLibPiece } from './pieces'
 import { PackageInfo } from '../../coreSystem'
 import { areThereActiveRundownsInStudio } from './studio'
 import { updateSourceLayerInfinitesAfterPart, cropInfinitesOnLayer, stopInfinitesRunningOnLayer } from './infinites'
@@ -210,9 +210,9 @@ export namespace ServerPlayoutAPI {
 
 			let pBlueprint = makePromise(() => getBlueprintOfRundown(rundown))
 
-			const currentPartInstance = rundown.currentPartInstanceId ? rundownData.partInstancesMap[rundown.currentPartInstanceId] : undefined
+			const currentPartInstance = rundownData.currentPartInstance
 			if (currentPartInstance && currentPartInstance.part.transitionDuration) {
-				const prevPartInstance = rundown.previousPartInstanceId ? rundownData.partInstancesMap[rundown.previousPartInstanceId] : undefined
+				const prevPartInstance = rundownData.previousPartInstance
 				const allowTransition = prevPartInstance && !prevPartInstance.part.disableOutTransition
 				// If there was a transition from the previous Part, then ensure that has finished before another take is permitted
 				if (allowTransition) {
@@ -249,7 +249,7 @@ export namespace ServerPlayoutAPI {
 					}))
 				}
 				if (rundown.previousPartInstanceId) {
-					const prevPartInstance = rundownData.partInstancesMap[rundown.previousPartInstanceId]
+					const prevPartInstance = rundownData.previousPartInstance
 					if (!prevPartInstance) throw new Meteor.Error(404, 'previousPart not found!')
 
 					// Clear the extended mark on the original
@@ -269,9 +269,9 @@ export namespace ServerPlayoutAPI {
 				return ClientAPI.responseSuccess()
 			}
 
-			const previousPart = currentPartInstance || null
+			const previousPartInstance = currentPartInstance || null
 
-			const takePartInstance = rundownData.partInstancesMap[rundown.nextPartInstanceId]
+			const takePartInstance = rundownData.nextPartInstance
 			if (!takePartInstance) throw new Meteor.Error(404, 'takePartInstance not found!')
 			// let takeSegment = rundownData.segmentsMap[takePart.segmentId]
 			let partAfter = fetchAfter(rundownData.parts, {
@@ -281,8 +281,7 @@ export namespace ServerPlayoutAPI {
 
 			let nextPart: DBPart | null = partAfter || null
 
-			// beforeTake(rundown, previousPart || null, takePart)
-			beforeTake(rundownData, previousPart || null, takePartInstance)
+			beforeTake(rundownData, previousPartInstance || null, takePartInstance)
 
 
 			const { blueprint } = waitForPromise(pBlueprint)
@@ -298,12 +297,12 @@ export namespace ServerPlayoutAPI {
 			}
 			// TODO - the state could change after this sampling point. This should be handled properly
 			let previousPartEndState: PartEndState | undefined = undefined
-			if (blueprint.getEndStateForPart && previousPart) {
+			if (blueprint.getEndStateForPart && previousPartInstance) {
 				const time = getCurrentTime()
-				const resolvedPieces = getResolvedPieces(previousPart)
+				const resolvedPieces = getResolvedPieces(previousPartInstance)
 
 				const context = new RundownContext(rundown)
-				previousPartEndState = blueprint.getEndStateForPart(context, rundown.previousPersistentState, previousPart.previousPartEndState, resolvedPieces, time)
+				previousPartEndState = blueprint.getEndStateForPart(context, rundown.previousPersistentState, previousPartInstance.previousPartEndState, resolvedPieces, time)
 				logger.info(`Calculated end state in ${getCurrentTime() - time}ms`)
 			}
 			let ps: Array<Promise<any>> = []
@@ -342,10 +341,15 @@ export namespace ServerPlayoutAPI {
 			libSetNextPart(rundown, nextPart)
 			waitForPromiseAll(ps)
 			ps = []
+			rundownData = {
+				...rundownData,
+				// Update the selectedPartInstances
+				...rundown.getSelectedPartInstances()
+			}
 
 			// Setup the parts for the HOLD we are starting
 			if (m.previousPartInstanceId && m.holdState === RundownHoldState.ACTIVE) {
-				const previousPartInstance = rundownData.partInstancesMap[m.previousPartInstanceId]
+				const previousPartInstance = rundownData.previousPartInstance
 				if (!previousPartInstance) throw new Meteor.Error(404, 'previousPart not found!')
 
 				// Make a copy of any item which is flagged as an 'infinite' extension
@@ -488,18 +492,17 @@ export namespace ServerPlayoutAPI {
 
 		if (rundown.holdState && rundown.holdState !== RundownHoldState.COMPLETE) throw new Meteor.Error(501, `Rundown "${rundownId}" cannot change next during hold!`)
 
+		const { currentPartInstance, nextPartInstance } = rundown.getSelectedPartInstances()
+
 		let currentNextPart: Part
 		if (nextPartId0) {
 			const nextPart = Parts.findOne(nextPartId0)
 			if (!nextPart) throw new Meteor.Error(404, `Part "${nextPartId0}" not found!`)
 			currentNextPart = nextPart
 		} else {
-			const nextPartIdTmp = rundown.nextPartInstanceId || rundown.currentPartInstanceId
-			if (!nextPartIdTmp) throw new Meteor.Error(501, `Rundown "${rundownId}" has no next and no current part!`)
-
-			const nextPart = PartInstances.findOne(nextPartIdTmp)
-			if (!nextPart) throw new Meteor.Error(501, `Rundown "${rundownId}" has an invalid next or current part!`)
-			currentNextPart = nextPart.part
+			const nextPartTmp = nextPartInstance || currentPartInstance
+			if (!nextPartTmp) throw new Meteor.Error(501, `Rundown "${rundownId}" has no next and no current part!`)
+			currentNextPart = nextPartTmp.part
 		}
 
 		let currentNextSegment = Segments.findOne(currentNextPart.segmentId) as Segment
@@ -551,7 +554,7 @@ export namespace ServerPlayoutAPI {
 		let part = parts[partIndex]
 		if (!part) throw new Meteor.Error(501, `Part index ${partIndex} not found in list of parts!`)
 
-		if ((part._id === rundown.currentPartId && !nextPartId0) || part.invalid) {
+		if ((currentPartInstance && part._id === currentPartInstance.part._id && !nextPartId0) || part.invalid) {
 			// Whoops, we're not allowed to next to that.
 			// Skip it, then (ie run the whole thing again)
 			if (part._id !== nextPartId0) {
@@ -854,16 +857,16 @@ export namespace ServerPlayoutAPI {
 
 						setRundownStartedPlayback(rundown, startedPlayback) // Set startedPlayback on the rundown if this is the first item to be played
 
-						let partsAfter = rundown.getParts({
+						const partsAfter = rundown.getParts({
 							_rank: {
-								$gt: playingPart._rank,
+								$gt: playingPartInstance.part._rank,
 							},
-							_id: { $ne: playingPart._id }
+							_id: { $ne: playingPartInstance.part._id },
+							invalid: { $ne: true }
 						}, {
 							limit: 1
 						})
-
-						let nextPart: Part | null = _.first(partsAfter) || null
+						const nextPart = _.first(partsAfter) || null
 
 						const rundownChange = literal<Partial<Rundown>>({
 							previousPartInstanceId: rundown.currentPartInstanceId,
@@ -880,14 +883,16 @@ export namespace ServerPlayoutAPI {
 					} else {
 						// a part is being played that has not been selected for playback by Core
 						// show must go on, so find next part and update the Rundown, but log an error
-						let partsAfter = rundown.getParts({
+						const partsAfter = rundown.getParts({
 							_rank: {
-								$gt: playingPart._rank,
+								$gt: playingPartInstance.part._rank,
 							},
-							_id: { $ne: playingPart._id }
+							_id: { $ne: playingPartInstance.part._id },
+							invalid: { $ne: true }
+						}, {
+							limit: 1
 						})
-
-						let nextPart: Part | null = partsAfter[0] || null
+						const nextPart = _.first(partsAfter) || null
 
 						setRundownStartedPlayback(rundown, startedPlayback) // Set startedPlayback on the rundown if this is the first item to be played
 
@@ -1213,11 +1218,11 @@ function beforeTake (rundownData: PlayoutRundownData, currentPartInstance: PartI
 	if (currentPartInstance) {
 		const adjacentPart = _.find(rundownData.parts, (part) => {
 			return (
-				part.segmentId === currentPart.segmentId &&
-				part._rank > currentPart._rank
+				part.segmentId === currentPartInstance.segmentId &&
+				part._rank > currentPartInstance.part._rank
 			)
 		})
-		if (!adjacentPart || adjacentPart._id !== nextPart._id) {
+		if (!adjacentPart || adjacentPart._id !== nextPartInstance.part._id) {
 			// adjacent Part isn't the next part, do not overflow
 			return
 		}

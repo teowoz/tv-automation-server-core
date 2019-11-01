@@ -40,6 +40,11 @@ export namespace IngestActions {
 	 * @param currentPlayingPart
 	 */
 	export function notifyCurrentPlayingPart (rundown: Rundown, currentPlayingPart: Part | null) {
+		if (!rundown.peripheralDeviceId) {
+			// If a rundown has no peripheralDevice, then there is nothing to notify
+			return
+		}
+
 		const device = getPeripheralDeviceFromRundown(rundown)
 
 		if (rundown.rehearsal) currentPlayingPart = null

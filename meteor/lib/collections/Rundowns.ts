@@ -194,6 +194,7 @@ export class Rundown implements DBRundown {
 		Rundowns.remove(this._id)
 		Segments.remove({ rundownId: this._id })
 		Parts.remove({ rundownId: this._id })
+		PartInstances.remove({ rundownId: this._id })
 		Pieces.remove({ rundownId: this._id })
 		AdLibPieces.remove({ rundownId: this._id })
 		RundownBaselineObjs.remove({ rundownId: this._id })
@@ -258,24 +259,28 @@ export class Rundown implements DBRundown {
 		makePromise(() => {
 			return Pieces.find({ rundownId: this._id }).fetch()
 		}),
-		makePromise(() => {
-			let partInstances = _.map(this.getActivePartInstances(), (instance) => {
-				// Override member function to use cached data instead:
-				instance.part.getAllPieces = () => {
-					return _.map(_.filter(pieces, (piece) => {
-						return (
-							piece.partId === instance._id
-						)
-					}), (part) => {
-						return _.clone(part)
-					})
-				}
-				return instance
+		// makePromise(() => {
+		// 	let partInstances = _.map(this.getActivePartInstances(), (instance) => {
+		// 		// Override member function to use cached data instead:
+		// 		instance.part.getAllPieces = () => {
+		// 			return _.map(_.filter(pieces, (piece) => {
+		// 				return (
+		// 					piece.partId === instance._id
+		// 				)
+		// 			}), (part) => {
+		// 				return _.clone(part)
+		// 			})
+		// 		}
+		// 		return instance
 
-			})
-			let partInstancesMap = normalizeArray(partInstances, '_id')
-			return { partInstances, partInstancesMap }
-		}))
+		// 	})
+		// 	let partInstancesMap = normalizeArray(partInstances, '_id')
+		// 	return { partInstances, partInstancesMap }
+		// })
+		makePromise(() => {
+			return this.getSelectedPartInstances()
+		})
+		)
 		// const { segments, segmentsMap } = r[0] as UnPromisify<typeof ps[0]>
 		// const { parts, partsMap } = r[1] as UnPromisify<typeof ps[1]>
 		const pieces = r[2]
@@ -326,9 +331,9 @@ export interface PlayoutRundownData {
 	partsMap: {[id: string]: Part | undefined}
 	pieces: Array<Piece>
 
-	// TODO - swap out for the current, next, and previous instances as that is all we should ever need
-	partInstances: Array<PartInstance>
-	partInstancesMap: {[id: string]: PartInstance | undefined}
+	currentPartInstance: PartInstance | undefined
+	nextPartInstance: PartInstance | undefined
+	previousPartInstance: PartInstance | undefined
 }
 
 // export const Rundowns = createMongoCollection<Rundown>('rundowns', {transform: (doc) => applyClassToDocument(Rundown, doc) })

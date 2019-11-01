@@ -239,10 +239,9 @@ function getTimelineRundown (studio: Studio, activeRundownData: PlayoutRundownDa
 				const showStyleBlueprintManifest = showStyleBlueprint0.blueprint
 
 
-				const currentPart = rundownData.rundown.currentPartInstanceId && rundownData.partInstancesMap[rundownData.rundown.currentPartInstanceId]
+				const currentPart = rundownData.currentPartInstance
 				if (showStyleBlueprintManifest.onTimelineGenerate && currentPart) {
 					const context = new PartEventContext(activeRundown, studio, currentPart)
-					// const resolvedPieces = getResolvedPieces(currentPart)
 					const resolvedPieces = getResolvedPiecesFromFullTimeline(rundownData, timelineObjs)
 					const tlGenRes = waitForPromise(showStyleBlueprintManifest.onTimelineGenerate(context, timelineObjs, rundownData.rundown.previousPersistentState, currentPart.previousPartEndState, resolvedPieces.pieces))
 					timelineObjs = _.map(tlGenRes.timeline, (object: OnGenerateTimelineObj) => {
@@ -430,16 +429,16 @@ function buildTimelineObjsForRundown (rundownData: PlayoutRundownData, baselineI
 	// Fetch the nextPart first, because that affects how the currentPart will be treated
 	if (activeRundown.nextPartInstanceId) {
 		// We may be at the beginning of a show, and there can be no currentPart and we are waiting for the user to Take
-		nextPart = rundownData.partInstancesMap[activeRundown.nextPartInstanceId]
+		nextPart = rundownData.nextPartInstance
 		if (!nextPart) throw new Meteor.Error(404, `PartInstance "${activeRundown.nextPartInstanceId}" not found!`)
 	}
 
 	if (activeRundown.currentPartInstanceId) {
-		currentPart = rundownData.partInstancesMap[activeRundown.currentPartInstanceId]
+		currentPart = rundownData.currentPartInstance
 		if (!currentPart) throw new Meteor.Error(404, `PartInstance "${activeRundown.currentPartInstanceId}" not found!`)
 
 		if (activeRundown.previousPartInstanceId) {
-			previousPart = rundownData.partInstancesMap[activeRundown.previousPartInstanceId]
+			previousPart = rundownData.previousPartInstance
 			if (!previousPart) throw new Meteor.Error(404, `PartInstance "${activeRundown.previousPartInstanceId}" not found!`)
 		}
 	}
