@@ -46,7 +46,7 @@ export const L3rdSourceRenderer = translate()(class extends CustomLayerItemRende
 			super.componentDidUpdate(prevProps, prevState)
 		}
 
-		if (this.props.piece.name !== prevProps.piece.name) {
+		if (this.props.piece.piece.name !== prevProps.piece.piece.name) {
 			this.updateAnchoredElsWidths()
 		}
 	}
@@ -54,7 +54,7 @@ export const L3rdSourceRenderer = translate()(class extends CustomLayerItemRende
 	render () {
 		const { t } = this.props
 
-		const noraContent = this.props.piece.content as NoraContent
+		const noraContent = this.props.piece.piece.content as NoraContent
 
 		let properties: Array<KeyValue> = []
 		if (noraContent && noraContent.payload && noraContent.payload.content) {
@@ -86,8 +86,8 @@ export const L3rdSourceRenderer = translate()(class extends CustomLayerItemRende
 			changed = noraContent.payload.changed
 		}
 
-		let templateName
-		let templateVariant
+		let templateName: string | undefined
+		let templateVariant: string | undefined
 
 		if (noraContent && noraContent.payload && noraContent.payload.metadata && noraContent.payload.metadata.templateName) {
 			templateName = noraContent.payload.metadata.templateName
@@ -100,7 +100,7 @@ export const L3rdSourceRenderer = translate()(class extends CustomLayerItemRende
 		return <React.Fragment>
 					<span className='segment-timeline__piece__label' ref={this.setLeftLabelRef} style={this.getItemLabelOffsetLeft()}>
 						<span className='segment-timeline__piece__label'>
-							{this.props.piece.name}
+							{this.props.piece.piece.name}
 						</span>
 					</span>
 					<span className='segment-timeline__piece__label right-side' ref={this.setRightLabelRef} style={this.getItemLabelOffsetRight()}>
@@ -127,13 +127,13 @@ export const L3rdSourceRenderer = translate()(class extends CustomLayerItemRende
 										<td className='mini-inspector__row--timing'></td>
 										<td className='mini-inspector__row--timing'>
 											<span className='mini-inspector__in-point'>{RundownUtils.formatTimeToShortTime(this.props.piece.renderedInPoint || 0)}</span>
-											{this.props.piece.infiniteMode ?
+											{this.props.piece.piece.infiniteMode ?
 												(
-													(this.props.piece.infiniteMode === PieceLifespan.OutOnNextPart && <span className='mini-inspector__duration'>{t('Until next take')}</span>) ||
-													(this.props.piece.infiniteMode === PieceLifespan.OutOnNextSegment && <span className='mini-inspector__duration'>{t('Until next segment')}</span>) ||
-													(this.props.piece.infiniteMode === PieceLifespan.Infinite && <span className='mini-inspector__duration'>{t('Infinite')}</span>)
+													(this.props.piece.piece.infiniteMode === PieceLifespan.OutOnNextPart && <span className='mini-inspector__duration'>{t('Until next take')}</span>) ||
+													(this.props.piece.piece.infiniteMode === PieceLifespan.OutOnNextSegment && <span className='mini-inspector__duration'>{t('Until next segment')}</span>) ||
+													(this.props.piece.piece.infiniteMode === PieceLifespan.Infinite && <span className='mini-inspector__duration'>{t('Infinite')}</span>)
 												)
-												: <span className='mini-inspector__duration'>{RundownUtils.formatTimeToShortTime(this.props.piece.renderedDuration || (_.isNumber(this.props.piece.enable.duration) ? parseFloat(this.props.piece.enable.duration as any as string) : 0))}</span>
+												: <span className='mini-inspector__duration'>{RundownUtils.formatTimeToShortTime(this.props.piece.renderedDuration || (_.isNumber(this.props.piece.piece.enable.duration) ? parseFloat(this.props.piece.piece.enable.duration as any as string) : 0))}</span>
 											}
 											{changed && <span className='mini-inspector__changed'><Moment date={changed} calendar={true} /></span>}
 										</td>

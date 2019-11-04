@@ -305,8 +305,8 @@ export class Rundown implements DBRundown {
 		}))
 		// const { segments, segmentsMap } = r[0] as UnPromisify<typeof ps[0]>
 		// const { parts, partsMap } = r[1] as UnPromisify<typeof ps[1]>
-		const pieces = r[2]
-		const selectedInstancePieces = r[3]
+		const pieces: Piece[] = r[2]
+		const selectedInstancePieces: PieceInstance[] = r[3]
 		// const { partInstances, partInstancesMap } = r[3] as UnPromisify<typeof ps[3]>
 
 		return {

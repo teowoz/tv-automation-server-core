@@ -43,6 +43,8 @@ export function resetRundown (rundown: Rundown) {
 		$set: {
 			reset: true
 		}
+	}, {
+		multi: true
 	})
 
 	// Parts.remove({

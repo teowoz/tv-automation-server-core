@@ -1886,7 +1886,7 @@ class extends MeteorReactComponent<Translated<IProps & ITrackedProps>, IState> {
 									<ClipTrimDialog
 										studio={this.props.studio}
 										rundownId={this.props.rundownId}
-										selectedPiece={this.state.selectedPiece}
+										selectedPiece={this.state.selectedPiece.piece}
 										onClose={() => this.setState({ isClipTrimmerOpen: false })}
 										/>
 								}

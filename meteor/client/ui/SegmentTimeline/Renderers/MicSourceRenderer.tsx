@@ -43,7 +43,7 @@ export const MicSourceRenderer = translate()(class extends CustomLayerItemRender
 	refreshLine = () => {
 		if (this.itemElement) {
 			this.itemPosition = this.itemElement.offsetLeft
-			const content = this.props.piece.content as ScriptContent
+			const content = this.props.piece.piece.content as ScriptContent
 			let scriptReadTime = 0
 			if (content && content.sourceDuration) {
 				scriptReadTime = content.sourceDuration * this.props.timeScale
@@ -98,8 +98,7 @@ export const MicSourceRenderer = translate()(class extends CustomLayerItemRender
 			(prevProps.piece.renderedInPoint !== this.props.piece.renderedInPoint) ||
 			(prevProps.piece.renderedDuration !== this.props.piece.renderedDuration) ||
 			(prevProps.piece.playoutDuration !== this.props.piece.playoutDuration) ||
-			!_.isEqual(prevProps.piece.userDuration, this.props.piece.userDuration) ||
-			!_.isEqual(prevProps.piece.enable, this.props.piece.enable)
+			!_.isEqual(prevProps.piece.piece.enable, this.props.piece.piece.enable)
 		) {
 			_forceSizingRecheck = true
 		}
@@ -117,7 +116,7 @@ export const MicSourceRenderer = translate()(class extends CustomLayerItemRender
 			}
 		}
 
-		const content = this.props.piece.content as ScriptContent
+		const content = this.props.piece.piece.content as ScriptContent
 		if (content.sourceDuration && content.sourceDuration !== this.readTime) {
 			_forceSizingRecheck = true
 		}
@@ -126,7 +125,7 @@ export const MicSourceRenderer = translate()(class extends CustomLayerItemRender
 			this.refreshLine()
 		}
 
-		if (this.props.piece.name !== prevProps.piece.name) {
+		if (this.props.piece.piece.name !== prevProps.piece.piece.name) {
 			this.updateAnchoredElsWidths()
 		}
 	}
@@ -138,7 +137,7 @@ export const MicSourceRenderer = translate()(class extends CustomLayerItemRender
 
 	render () {
 		const { t } = this.props
-		let labelItems = (this.props.piece.name || '').split('||')
+		let labelItems = (this.props.piece.piece.name || '').split('||')
 		let begin = labelItems[0] || ''
 		let end = labelItems[1] || ''
 
@@ -147,7 +146,7 @@ export const MicSourceRenderer = translate()(class extends CustomLayerItemRender
 		// 	return str.substr(0, str.substr(0, maxLen).lastIndexOf(separator))
 		// }
 
-		const content = this.props.piece.content as ScriptContent
+		const content = this.props.piece.piece.content as ScriptContent
 		let startOfScript = content.fullScript || ''
 		let cutLength = startOfScript.length
 		if (startOfScript.length > SCRIPT_PART_LENGTH) {

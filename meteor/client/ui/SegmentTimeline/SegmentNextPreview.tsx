@@ -39,7 +39,7 @@ export const SegmentNextPreview = translate()(class extends React.Component<Tran
 						{layer.followingItems && layer.followingItems
 							.filter((piece) => {
 								// filter only pieces belonging to this part
-								return this.props.part && ((piece.partId === this.props.part._id) ?
+								return this.props.part && ((piece.partInstanceId === this.props.part._id) ?
 									// filter only pieces, that have not yet been linked to parent items
 									((piece as PieceUi).linked !== true) ?
 										true :

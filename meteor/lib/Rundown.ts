@@ -13,7 +13,7 @@ import { Part, Parts } from './collections/Parts'
 import { Rundown } from './collections/Rundowns'
 import { ShowStyleBase } from './collections/ShowStyleBases'
 import { PartInstance, FindPartInstanceOrWrapToTemporary, PartInstances, WrapPartToTemporaryInstance } from './collections/PartInstances'
-import { PieceInstance, PieceInstances } from './collections/PieceInstances'
+import { PieceInstance, PieceInstances, WrapPieceToTemporaryInstance } from './collections/PieceInstances'
 
 export const DEFAULT_DISPLAY_DURATION = 3000
 
@@ -209,11 +209,18 @@ export function getResolvedSegment (showStyleBase: ShowStyleBase, rundown: Rundo
 
 			// extend objects to match the Extended interface
 			let partE: PartInstanceExtended = extendMandadory(part, {
-				pieces: _.map(Pieces.find({ partId: part.part._id }).fetch(), (piece) => {
-					return extendMandadory<Piece, PieceExtended>(piece, {
+				pieces: part.isTemporary ? _.map(Pieces.find({ partId: part.part._id }).fetch(), (piece) => {
+					return {
+						...WrapPieceToTemporaryInstance(piece, part._id),
 						renderedDuration: 0,
 						renderedInPoint: 0
-					})
+					}
+				}) : _.map(PieceInstances.find({ partInstanceId: part._id }).fetch(), (piece) => {
+					return {
+						...piece,
+						renderedDuration: 0,
+						renderedInPoint: 0
+					}
 				}),
 				renderedDuration: 0,
 				startsAt: 0,
