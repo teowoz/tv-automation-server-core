@@ -1,41 +1,23 @@
 import * as React from 'react'
 import * as _ from 'underscore'
-import * as Velocity from 'velocity-animate'
 import { Translated, translateWithTracker } from '../../lib/ReactMeteorData/react-meteor-data'
-import { translate } from 'react-i18next'
-import { Rundown } from '../../../lib/collections/Rundowns'
-import { Segment } from '../../../lib/collections/Segments'
-import { Part } from '../../../lib/collections/Parts'
-import { AdLibPiece } from '../../../lib/collections/AdLibPieces'
-import { AdLibListItem } from './AdLibListItem'
-import * as ClassNames from 'classnames'
 import { mousetrapHelper } from '../../lib/mousetrapHelper'
-
-import * as faTh from '@fortawesome/fontawesome-free-solid/faTh'
-import * as faList from '@fortawesome/fontawesome-free-solid/faList'
-import * as faTimes from '@fortawesome/fontawesome-free-solid/faTimes'
-import * as FontAwesomeIcon from '@fortawesome/react-fontawesome'
 
 import { Spinner } from '../../lib/Spinner'
 import { MeteorReactComponent } from '../../lib/MeteorReactComponent'
 import { RundownViewKbdShortcuts } from '../RundownView'
-import { ShowStyleBase } from '../../../lib/collections/ShowStyleBases'
 import { IOutputLayer, ISourceLayer } from 'tv-automation-sofie-blueprints-integration'
-import { PubSub, meteorSubscribe } from '../../../lib/api/pubsub'
+import { PubSub } from '../../../lib/api/pubsub'
 import { doUserAction } from '../../lib/userAction'
 import { UserActionAPI } from '../../../lib/api/userActions'
 import { NotificationCenter, Notification, NoticeLevel } from '../../lib/notifications/notifications'
-import { RundownLayoutFilter, DashboardLayoutFilter } from '../../../lib/collections/RundownLayouts'
-import { RundownBaselineAdLibPieces } from '../../../lib/collections/RundownBaselineAdLibPieces'
-import { Random } from 'meteor/random'
-import { literal } from '../../../lib/lib'
-import { RundownAPI } from '../../../lib/api/rundown'
+import { DashboardLayoutFilter } from '../../../lib/collections/RundownLayouts'
 import { IAdLibPanelProps, IAdLibPanelTrackedProps, fetchAndFilter, AdLibPieceUi, matchFilter, AdLibPanelToolbar } from './AdLibPanel'
 import { DashboardPieceButton } from './DashboardPieceButton'
 import { ensureHasTrailingSlash } from '../../lib/lib'
 import { Studio } from '../../../lib/collections/Studios'
-import { Piece, Pieces } from '../../../lib/collections/Pieces'
-import { PartInstance, PartInstances } from '../../../lib/collections/PartInstances'
+import { PartInstances } from '../../../lib/collections/PartInstances'
+import { PieceInstances, PieceInstance } from '../../../lib/collections/PieceInstances'
 
 interface IState {
 	outputLayers: {
@@ -55,29 +37,23 @@ interface IDashboardPanelProps {
 interface IDashboardPanelTrackedProps {
 	studio?: Studio
 	unfinishedPieces: {
-		[key: string]: Piece[]
+		[key: string]: PieceInstance[]
 	}
 }
 
 export const DashboardPanel = translateWithTracker<IAdLibPanelProps & IDashboardPanelProps, IState, IAdLibPanelTrackedProps & IDashboardPanelTrackedProps>((props: Translated<IAdLibPanelProps>) => {
 	const currentPartIntance = props.rundown.currentPartInstanceId ? PartInstances.findOne(props.rundown.currentPartInstanceId) : undefined
-	const unfinishedPieces = _.groupBy(currentPartIntance ? Pieces.find({
+	const unfinishedPieces = _.groupBy(currentPartIntance ? PieceInstances.find({
 		rundownId: props.rundown._id,
 		partId: currentPartIntance.part._id,
-		startedPlayback: {
+		'timings.startedPlayback': {
 			$exists: true
 		},
-		$or: [{
-			stoppedPlayback: {
-				$eq: 0
-			}
-		}, {
-			stoppedPlayback: {
-				$exists: false
-			}
-		}],
 		adLibSourceId: {
 			$exists: true
+		},
+		'timings.stoppedPlayback': {
+			$exists: false
 		}
 	}).fetch() : [], (piece) => piece.adLibSourceId)
 
@@ -129,30 +105,42 @@ export const DashboardPanel = translateWithTracker<IAdLibPanelProps & IDashboard
 		this.subscribe(PubSub.segments, {
 			rundownId: this.props.rundown._id
 		})
-		this.subscribe(PubSub.parts, {
-			rundownId: this.props.rundown._id
-		})
+		// this.subscribe(PubSub.parts, {
+		// 	rundownId: this.props.rundown._id
+		// })
 		this.subscribe(PubSub.partInstances, {
 			rundownId: this.props.rundown._id
 		})
-		this.subscribe(PubSub.pieces, {
+		this.subscribe(PubSub.pieceInstances, {
 			rundownId: this.props.rundown._id,
-			startedPlayback: {
+			'timings.startedPlayback': {
 				$exists: true
 			},
 			adLibSourceId: {
 				$exists: true
 			},
-			$or: [{
-				stoppedPlayback: {
-					$eq: 0
-				}
-			}, {
-				stoppedPlayback: {
-					$exists: false
-				}
-			}]
+			'timings.stoppedPlayback': {
+				$exists: false
+			}
 		})
+		// this.subscribe(PubSub.pieces, {
+		// 	rundownId: this.props.rundown._id,
+		// 	startedPlayback: {
+		// 		$exists: true
+		// 	},
+		// 	adLibSourceId: {
+		// 		$exists: true
+		// 	},
+		// 	$or: [{
+		// 		stoppedPlayback: {
+		// 			$eq: 0
+		// 		}
+		// 	}, {
+		// 		stoppedPlayback: {
+		// 			$exists: false
+		// 		}
+		// 	}]
+		// })
 		this.subscribe(PubSub.adLibPieces, {
 			rundownId: this.props.rundown._id
 		})

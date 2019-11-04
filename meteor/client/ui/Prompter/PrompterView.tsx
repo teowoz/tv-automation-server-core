@@ -370,6 +370,7 @@ export const Prompter = translateWithTracker<IPrompterProps, {}, IPrompterTracke
 		this.subscribe(PubSub.parts, { rundownId: this.props.rundownId })
 		this.subscribe(PubSub.partInstances, { rundownId: this.props.rundownId })
 		this.subscribe(PubSub.pieces, { rundownId: this.props.rundownId })
+		this.subscribe(PubSub.pieceInstances, { rundownId: this.props.rundownId })
 
 	}
 

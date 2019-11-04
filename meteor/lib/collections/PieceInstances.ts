@@ -55,6 +55,9 @@ export interface PieceInstance extends IBlueprintPieceInstance {
 
 	/** Playout timings, in here we log times when playout happens */
 	timings: TmpPieceInstanceTimings
+
+	/** Once a PartInstance is reset it should no longer be shown to the user. */
+	reset?: boolean
 }
 
 export function WrapPieceToTemporaryInstance (piece: Piece, partInstanceId: string): PieceInstance {

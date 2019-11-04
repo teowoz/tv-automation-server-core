@@ -303,6 +303,9 @@ export const ClockView = translate()(withTracker(function (props: IPropsHeader) 
 				this.subscribe(PubSub.pieces, {
 					rundownId: rundown._id
 				})
+				this.subscribe(PubSub.pieceInstances, {
+					rundownId: rundown._id
+				})
 				this.subscribe(PubSub.showStyleBases, {
 					_id: rundown.showStyleBaseId
 				})

@@ -19,6 +19,8 @@ export enum PubSub {
 	adLibPieces = 'adLibPieces',
 	pieces = 'pieces',
 	piecesSimple = 'piecesSimple',
+	pieceInstances = 'pieceInstances',
+	pieceInstancesSimple = 'pieceInstancesSimple',
 	parts = 'parts',
 	partInstances = 'partInstances',
 	segments = 'segments',

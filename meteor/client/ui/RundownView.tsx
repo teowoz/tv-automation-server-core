@@ -1245,6 +1245,9 @@ class extends MeteorReactComponent<Translated<IProps & ITrackedProps>, IState> {
 		this.subscribe(PubSub.pieces, {
 			rundownId: rundownId
 		})
+		this.subscribe(PubSub.pieceInstances, {
+			rundownId: rundownId
+		})
 		this.subscribe(PubSub.adLibPieces, {
 			rundownId: rundownId
 		})
