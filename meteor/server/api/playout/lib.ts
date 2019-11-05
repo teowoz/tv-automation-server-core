@@ -22,7 +22,7 @@ import { updateSegmentsFromIngestData } from '../ingest/rundownInput'
 import { updateSourceLayerInfinitesAfterPart } from './infinites'
 import { Studios } from '../../../lib/collections/Studios'
 import { DBSegment, Segments } from '../../../lib/collections/Segments'
-import { PartInstance, PartInstances } from '../../../lib/collections/PartInstances'
+import { PartInstance, PartInstances, DBPartInstance } from '../../../lib/collections/PartInstances'
 import { PieceInstance, PieceInstances } from '../../../lib/collections/PieceInstances'
 
 /**
@@ -31,20 +31,40 @@ import { PieceInstance, PieceInstances } from '../../../lib/collections/PieceIns
  */
 export function resetRundown (rundown: Rundown) {
 	logger.info('resetRundown ' + rundown._id)
-	// Remove all dunamically inserted pieces (adlibs etc)
-	Pieces.remove({
-		rundownId: rundown._id,
-		dynamicallyInserted: true
+	// // Remove all dunamically inserted pieces (adlibs etc)
+	// Pieces.remove({
+	// 	rundownId: rundown._id,
+	// 	dynamicallyInserted: true
+	// })
+
+	// TODO - switch back to this
+	// PartInstances.update({
+	// 	rundownId: rundown._id
+	// }, {
+	// 	$set: {
+	// 		reset: true
+	// 	}
+	// }, {
+	// 	multi: true
+	// })
+
+	// PieceInstances.update({
+	// 	rundownId: rundown._id
+	// }, {
+	// 	$set: {
+	// 		reset: true
+	// 	}
+	// }, {
+	// 	multi: true
+	// })
+
+	// TODO TEMPORARY - it is easier to debug with a cleaner db, so just delete instead of reset
+	PartInstances.remove({
+		rundownId: rundown._id
 	})
 
-	PartInstances.update({
+	PieceInstances.remove({
 		rundownId: rundown._id
-	}, {
-		$set: {
-			reset: true
-		}
-	}, {
-		multi: true
 	})
 
 	// Parts.remove({
@@ -77,38 +97,38 @@ export function resetRundown (rundown: Rundown) {
 	// })
 
 	// Reset all pieces that were modified for holds
-	Pieces.update({
-		rundownId: rundown._id,
-		extendOnHold: true,
-		infiniteId: { $exists: true },
-	}, {
-		$unset: {
-			infiniteId: 0,
-			infiniteMode: 0,
-		}
-	}, { multi: true })
+	// Pieces.update({
+	// 	rundownId: rundown._id,
+	// 	extendOnHold: true,
+	// 	infiniteId: { $exists: true },
+	// }, {
+	// 	$unset: {
+	// 		infiniteId: 0,
+	// 		infiniteMode: 0,
+	// 	}
+	// }, { multi: true })
 
 	// Reset any pieces that were modified by inserted adlibs
-	Pieces.update({
-		rundownId: rundown._id,
-		originalInfiniteMode: { $exists: true }
-	}, {
-		$rename: {
-			originalInfiniteMode: 'infiniteMode'
-		}
-	}, { multi: true })
+	// Pieces.update({
+	// 	rundownId: rundown._id,
+	// 	originalInfiniteMode: { $exists: true }
+	// }, {
+	// 	$rename: {
+	// 		originalInfiniteMode: 'infiniteMode'
+	// 	}
+	// }, { multi: true })
 
-	Pieces.update({
-		rundownId: rundown._id
-	}, {
-		$unset: {
-			playoutDuration: 1,
-			startedPlayback: 1,
-			userDuration: 1,
-			disabled: 1,
-			hidden: 1
-		}
-	}, { multi: true })
+	// Pieces.update({
+	// 	rundownId: rundown._id
+	// }, {
+	// 	$unset: {
+	// 		playoutDuration: 1,
+	// 		startedPlayback: 1,
+	// 		userDuration: 1,
+	// 		disabled: 1,
+	// 		hidden: 1
+	// 	}
+	// }, { multi: true })
 
 	// ensure that any removed infinites are restored
 	updateSourceLayerInfinitesAfterPart(rundown)
@@ -173,17 +193,22 @@ export function refreshPart (dbRundown: DBRundown, dbPart: DBPart) {
 }
 export function setNextPart (
 	rundown: Rundown,
-	nextPart: DBPart | null,
+	rawNextPart: DBPart | DBPartInstance | null,
 	setManually?: boolean,
 	nextTimeOffset?: number | undefined
 ) {
 	const { currentPartInstance, nextPartInstance } = rundown.getSelectedPartInstances()
 
-	if (nextPart && nextPart.invalid) {
+	const newNextPartInstance = rawNextPart && 'part' in rawNextPart ? rawNextPart : null
+	const newNextPart = rawNextPart && 'part' in rawNextPart ? null : rawNextPart
+
+	if ((newNextPart && newNextPart.invalid) || (newNextPartInstance && newNextPartInstance.part.invalid)) {
 		throw new Meteor.Error(400, 'Part is marked as invalid, cannot set as next.')
 	}
-	if (nextPart && nextPart.rundownId !== rundown._id) {
-		throw new Meteor.Error(409, `Part "${nextPart._id}" not part of rundown "${rundown._id}"`)
+	if (newNextPart && newNextPart.rundownId !== rundown._id) {
+		throw new Meteor.Error(409, `Part "${newNextPart._id}" not part of rundown "${rundown._id}"`)
+	} else if (newNextPartInstance && newNextPartInstance.rundownId !== rundown._id) {
+		throw new Meteor.Error(409, `PartInstance "${newNextPartInstance._id}" not part of rundown "${rundown._id}"`)
 	}
 
 	// if (nextPart._id === rundown.currentPartId) {
@@ -192,12 +217,35 @@ export function setNextPart (
 
 	let ps: Array<Promise<any>> = []
 
-	if (nextPart) {
-		ps.push(resetPart(nextPart))
+	if (!newNextPartInstance && !newNextPart) {
+		// Remove any instances which havent been taken
+		ps.push(asyncCollectionRemove(PartInstances, {
+			rundownId: rundown._id,
+			'timings.take': { $exists: false }
+		}))
+
+		// TODO - cleanup old pieceInstances
+
+		ps.push(asyncCollectionUpdate(Rundowns, rundown._id, {
+			$set: literal<Partial<Rundown>>({
+				nextPartInstanceId: null,
+				nextPartManual: !!setManually
+			})
+		}))
+		rundown.nextPartInstanceId = null
+		rundown.nextPartManual = !!setManually
+	} else if (newNextPartInstance || newNextPart) {
+		if (newNextPart) {
+			ps.push(resetPart(newNextPart))
+		}
+
+		const nextPart = newNextPartInstance ? newNextPartInstance.part : newNextPart!
 
 		// create new instance
 		let newInstanceId: string
-		if (nextPartInstance && nextPartInstance.part._id === nextPart._id) {
+		if (newNextPartInstance) {
+			newInstanceId = newNextPartInstance._id
+		} if (nextPartInstance && nextPartInstance.part._id === nextPart._id) {
 			// Re-use existing
 			newInstanceId = nextPartInstance._id
 		} else {
@@ -237,6 +285,32 @@ export function setNextPart (
 			// TODO - cleanup old pieceInstances
 		}
 
+		// reset any previous instances of this part
+		ps.push(asyncCollectionUpdate(PartInstances, {
+			_id: { $ne: newInstanceId },
+			rundownId: rundown._id,
+			'part._id': nextPart._id,
+			reset: { $ne: true }
+		}, {
+			$set: {
+				reset: true
+			}
+		}, {
+			multi: true
+		}))
+		ps.push(asyncCollectionUpdate(PieceInstances, {
+			partInstanceId: { $ne: newInstanceId },
+			rundownId: rundown._id,
+			'piece.partId': nextPart._id,
+			reset: { $ne: true }
+		}, {
+			$set: {
+				reset: true
+			}
+		}, {
+			multi: true
+		}))
+
 		ps.push(asyncCollectionUpdate(Rundowns, rundown._id, {
 			$set: literal<Partial<Rundown>>({
 				nextPartInstanceId: newInstanceId,
@@ -248,21 +322,6 @@ export function setNextPart (
 		rundown.nextPartManual = !!setManually
 		rundown.nextTimeOffset = nextTimeOffset || null
 
-	} else {
-		// Remove any instances which havent been taken
-		ps.push(asyncCollectionRemove(PartInstances, {
-			rundownId: rundown._id,
-			'timings.take': { $exists: false }
-		}))
-
-		ps.push(asyncCollectionUpdate(Rundowns, rundown._id, {
-			$set: literal<Partial<Rundown>>({
-				nextPartInstanceId: null,
-				nextPartManual: !!setManually
-			})
-		}))
-		rundown.nextPartInstanceId = null
-		rundown.nextPartManual = !!setManually
 	}
 
 	waitForPromiseAll(ps)
@@ -284,19 +343,19 @@ function resetPart (part: DBPart): Promise<void> {
 	// 		stoppedPlayback: 1
 	// 	}
 	// }))
-	ps.push(asyncCollectionUpdate(Pieces, {
-		// rundownId: part.rundownId,
-		partId: part._id
-	}, {
-		$unset: {
-			startedPlayback: 1,
-			userDuration: 1,
-			disabled: 1,
-			hidden: 1
-		}
-	}, {
-		multi: true
-	}))
+	// ps.push(asyncCollectionUpdate(Pieces, {
+	// 	// rundownId: part.rundownId,
+	// 	partId: part._id
+	// }, {
+	// 	$unset: {
+	// 		startedPlayback: 1,
+	// 		userDuration: 1,
+	// 		disabled: 1,
+	// 		hidden: 1
+	// 	}
+	// }, {
+	// 	multi: true
+	// }))
 	// remove parts that have been dynamically queued for after this part (queued adLibs)
 	// ps.push(asyncCollectionRemove(Parts, {
 	// 	rundownId: part.rundownId,
@@ -304,25 +363,25 @@ function resetPart (part: DBPart): Promise<void> {
 	// 	dynamicallyInserted: true
 	// }))
 
-	// Remove all pieces that have been dynamically created (such as adLib pieces)
-	ps.push(asyncCollectionRemove(Pieces, {
-		rundownId: part.rundownId,
-		partId: part._id,
-		dynamicallyInserted: true
-	}))
+	// // Remove all pieces that have been dynamically created (such as adLib pieces)
+	// ps.push(asyncCollectionRemove(Pieces, {
+	// 	rundownId: part.rundownId,
+	// 	partId: part._id,
+	// 	dynamicallyInserted: true
+	// }))
 
-	// Reset any pieces that were modified by inserted adlibs
-	ps.push(asyncCollectionUpdate(Pieces, {
-		rundownId: part.rundownId,
-		partId: part._id,
-		originalInfiniteMode: { $exists: true }
-	}, {
-		$rename: {
-			originalInfiniteMode: 'infiniteMode'
-		}
-	}, {
-		multi: true
-	}))
+	// // Reset any pieces that were modified by inserted adlibs
+	// ps.push(asyncCollectionUpdate(Pieces, {
+	// 	rundownId: part.rundownId,
+	// 	partId: part._id,
+	// 	originalInfiniteMode: { $exists: true }
+	// }, {
+	// 	$rename: {
+	// 		originalInfiniteMode: 'infiniteMode'
+	// 	}
+	// }, {
+	// 	multi: true
+	// }))
 
 	// let isDirty = part.dirty || false
 

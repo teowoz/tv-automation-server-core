@@ -56,6 +56,9 @@ export interface Piece extends PieceGeneric, IBlueprintPiece {
 
 	/** This is set when the piece isn't infinite, but should overflow it's duration onto the adjacent (not just next) part on take */
 	overflows?: boolean
+
+	/** LEGACY */
+	infiniteId?: string
 }
 
 export const Pieces: TransformedCollection<Piece, Piece> = createMongoCollection<Piece>('pieces')

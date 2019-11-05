@@ -30,7 +30,7 @@ import { PlayoutRundownData } from '../../../lib/collections/Rundowns'
 import { PartInstance } from '../../../lib/collections/PartInstances'
 import { PieceInstance } from '../../../lib/collections/PieceInstances'
 
-export interface PieceResolved extends Piece {
+export interface PieceResolved extends PieceInstance {
 	/** Resolved start time of the piece */
 	resolvedStart: number
 	/** Whether the piece was successfully resolved */
@@ -40,19 +40,19 @@ export interface PieceResolved extends Piece {
  * Returns a list of the pieces in a Part, ordered in the order they will be played
  * @param part
  */
-export function getOrderedPiece (part: Part): Array<PieceResolved> {
-	const pieces = part.getAllPieces()
+export function getOrderedPiece (partInstance: PartInstance, pieceInstances: PieceInstance[]): Array<PieceResolved> {
+	// const pieces = part.getAllPieces()
 	const now = getCurrentTime()
-	const partStarted = part.getLastStartedPlayback()
+	const partStarted = partInstance.timings.startedPlayback
 
-	const itemMap: { [key: string]: Piece } = {}
-	pieces.forEach(i => itemMap[i._id] = i)
+	const itemMap: { [key: string]: PieceInstance } = {}
+	pieceInstances.forEach(i => itemMap[i._id] = i)
 
-	const objs: Array<TimelineObjRundown> = pieces.map(piece => {
+	const objs: Array<TimelineObjRundown> = pieceInstances.map(piece => {
 		const obj = clone(createPieceGroup(piece))
 
 		if (obj.enable.start === 0) {
-			if (piece.infiniteId && piece.infiniteId !== piece._id) {
+			if (piece.piece.infiniteId && piece.piece.infiniteId !== piece.piece._id) {
 				// Infinite coninuation, needs to start earlier otherwise it will likely end up being unresolved
 				obj.enable.start = 0
 			} else {
@@ -75,7 +75,7 @@ export function getOrderedPiece (part: Part): Array<PieceResolved> {
 	let unresolvedCount = tlResolved.statistics.unresolvedCount
 	_.each(tlResolved.objects, obj0 => {
 		const obj = obj0 as any as TimelineObjRundown
-		const pieceId = (obj.metadata || {}).pieceId
+		const pieceId = (obj.metadata || {}).pieceId // TODO - is this correct?
 		const piece = _.clone(itemMap[pieceId]) as PieceResolved
 		if (obj0.resolved.resolved && obj0.resolved.instances && obj0.resolved.instances.length > 0) {
 			piece.resolvedStart = obj0.resolved.instances[0].start || 0
@@ -87,7 +87,7 @@ export function getOrderedPiece (part: Part): Array<PieceResolved> {
 
 			resolvedPieces.push(piece)
 
-			if (piece.virtual) {
+			if (piece.piece.virtual) {
 				// Virtuals always are unresolved and should be ignored
 				unresolvedCount -= 1
 			} else {
@@ -97,18 +97,18 @@ export function getOrderedPiece (part: Part): Array<PieceResolved> {
 	})
 
 	if (unresolvedCount > 0) {
-		logger.error(`Got ${unresolvedCount} unresolved timeline-objects for part #${part._id} (${unresolvedIds.join(', ')})`)
+		logger.error(`Got ${unresolvedCount} unresolved timeline-objects for part #${partInstance._id} (${unresolvedIds.join(', ')})`)
 	}
-	if (pieces.length !== resolvedPieces.length) {
-		logger.error(`Got ${resolvedPieces.length} ordered pieces. Expected ${pieces.length} for part #${part._id}`)
+	if (pieceInstances.length !== resolvedPieces.length) {
+		logger.error(`Got ${resolvedPieces.length} ordered pieces. Expected ${pieceInstances.length} for part #${partInstance._id}`)
 	}
 
 	resolvedPieces.sort((a, b) => {
 		if (a.resolvedStart < b.resolvedStart) return -1
 		if (a.resolvedStart > b.resolvedStart) return 1
 
-		if (a.isTransition === b.isTransition) return 0
-		if (b.isTransition) return 1
+		if (a.piece.isTransition === b.piece.isTransition) return 0
+		if (b.piece.isTransition) return 1
 		return -1
 	})
 
@@ -125,7 +125,7 @@ export function createPieceGroupFirstObject (
 		studioId: '', // set later
 		rundownId: pieceInstance.rundownId,
 		pieceId: pieceInstance._id,
-		infinitePieceId: pieceInstance.infiniteId,
+		infinitePieceId: pieceInstance.piece.infiniteId,
 		objectType: TimelineObjType.RUNDOWN,
 		enable: { start: 0 },
 		layer: pieceInstance.piece.sourceLayerId + '_firstobject',
@@ -161,9 +161,9 @@ export function createPieceGroup (
 		isGroup: true,
 		rundownId: pieceInstance.rundownId,
 		pieceId: pieceInstance._id,
-		infinitePieceId: pieceInstance.infiniteId,
+		infinitePieceId: pieceInstance.piece.infiniteId,
 		objectType: TimelineObjType.RUNDOWN,
-		enable: calculatePieceTimelineEnable(pieceInstance.piece),
+		enable: calculatePieceTimelineEnable(pieceInstance),
 		layer: pieceInstance.piece.sourceLayerId,
 		metadata: {
 			pieceId: pieceInstance._id

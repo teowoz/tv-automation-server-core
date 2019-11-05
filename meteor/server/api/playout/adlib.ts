@@ -53,13 +53,13 @@ export namespace ServerPlayoutAdLibAPI {
 				const pieceInstances = getResolvedPieces(partInstance)
 				const resPiece = pieceInstances.find(p => p.piece._id === piece._id) // TODO - this doesnt mean the content is the same..
 
-				if (piece.startedPlayback && piece.startedPlayback <= getCurrentTime()) {
+				if (resPiece && resPiece.timings.startedPlayback && resPiece.timings.startedPlayback <= getCurrentTime()) {
 					if (
 						resPiece &&
 						resPiece.playoutDuration !== undefined &&
 						(
 							piece.infiniteMode ||
-							piece.startedPlayback + resPiece.playoutDuration >= getCurrentTime()
+							resPiece.timings.startedPlayback + resPiece.playoutDuration >= getCurrentTime()
 						)
 					) {
 						// logger.debug(`Piece "${piece._id}" is currently live and cannot be used as an ad-lib`)
@@ -132,19 +132,19 @@ export namespace ServerPlayoutAdLibAPI {
 		})
 		if (!partInstance) throw new Meteor.Error(404, `PartInstance "${partInstanceId}" not found!`)
 
-		let newPiece = convertAdLibToPieceInstance(adLibPiece, partInstance, queue)
-		Pieces.insert(newPiece)
+		const newPieceInstance = convertAdLibToPieceInstance(adLibPiece, partInstance, queue)
+		PieceInstances.insert(newPieceInstance)
 
 		if (queue) {
 			// keep infinite pieces
-			// TODO
-			Pieces.find({ rundownId: rundown._id, partId: orgPartId }).forEach(piece => {
-				// console.log(piece.name + ' has life span of ' + piece.infiniteMode)
-				if (piece.infiniteMode && piece.infiniteMode >= PieceLifespan.Infinite) {
-					let newPiece = convertAdLibToPieceInstance(piece, part!, queue)
-					Pieces.insert(newPiece)
-				}
-			})
+			// TODO - should this not handled by a call to updateInfinites?
+			// Pieces.find({ rundownId: rundown._id, partId: orgPartId }).forEach(piece => {
+			// 	// console.log(piece.name + ' has life span of ' + piece.infiniteMode)
+			// 	if (piece.infiniteMode && piece.infiniteMode >= PieceLifespan.Infinite) {
+			// 		let newPiece = convertAdLibToPieceInstance(piece, part!, queue)
+			// 		Pieces.insert(newPiece)
+			// 	}
+			// })
 
 			ServerPlayoutAPI.setNextPartInner(rundown, partInstance)
 		} else {
@@ -198,13 +198,14 @@ export namespace ServerPlayoutAdLibAPI {
 			})
 			if (!partInstance) throw new Meteor.Error(404, `PartInstance "${partInstanceId}" not found!`)
 
-			const piece = Pieces.findOne({
-				_id: pieceId,
-				rundownId: rundownId
+			const pieceInstance = PieceInstances.findOne({
+				'piece._id': pieceId,
+				rundownId: rundownId,
+				partInstanceId: partInstanceId
 			})
-			if (!piece) throw new Meteor.Error(404, `Part AdLib-copy-piece "${pieceId}" not found!`)
-			if (!piece.dynamicallyInserted) throw new Meteor.Error(501, `"${pieceId}" does not appear to be a dynamic Piece!`)
-			if (!piece.adLibSourceId) throw new Meteor.Error(501, `"${pieceId}" does not appear to be a Part AdLib-copy-piece!`)
+			if (!pieceInstance) throw new Meteor.Error(404, `Part AdLib-copy-piece "${pieceId}" not found!`)
+			if (!pieceInstance.dynamicallyInserted) throw new Meteor.Error(501, `"${pieceId}" does not appear to be a dynamic Piece!`)
+			if (!pieceInstance.adLibSourceId) throw new Meteor.Error(501, `"${pieceId}" does not appear to be a Part AdLib-copy-piece!`)
 
 			// To establish playback time, we need to look at the actual Timeline
 			const tlObj = Timeline.findOne({
@@ -216,8 +217,8 @@ export namespace ServerPlayoutAdLibAPI {
 			const parentOffset = partInstance.timings.startedPlayback || 0
 
 			let newExpectedDuration = 0
-			if (piece.startedPlayback) {
-				newExpectedDuration = getCurrentTime() - piece.startedPlayback
+			if (pieceInstance.timings.startedPlayback) {
+				newExpectedDuration = getCurrentTime() - pieceInstance.timings.startedPlayback
 			} else if (_.isNumber(tlObj.enable.start)) {
 				// If start is absolute within the part, we can do a better estimate
 				const actualStartTime = parentOffset + tlObj.enable.start
@@ -226,13 +227,12 @@ export namespace ServerPlayoutAdLibAPI {
 				logger.warn(`"${pieceId}" timeline object is not positioned absolutely or is still set to play now, assuming it's about to be played.`)
 			}
 
-			Pieces.update({
-				_id: pieceId
+			PieceInstances.update({
+				_id: pieceInstance._id
 			}, {
 				$set: {
-					userDuration: {
-						duration: newExpectedDuration
-					}
+					// TODO - this field doesnt currently exist..
+					userDuration: newExpectedDuration
 				}
 			})
 

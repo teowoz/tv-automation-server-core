@@ -62,7 +62,7 @@ import { areThereActiveRundownsInStudio } from './studio'
 import { updateSourceLayerInfinitesAfterPart, cropInfinitesOnLayer, stopInfinitesRunningOnLayer } from './infinites'
 import { rundownSyncFunction, RundownSyncFunctionPriority } from '../ingest/rundownInput'
 import { ServerPlayoutAdLibAPI } from './adlib'
-import { PartInstance, PartInstances } from '../../../lib/collections/PartInstances'
+import { PartInstance, PartInstances, DBPartInstance } from '../../../lib/collections/PartInstances'
 import { PieceInstances, PieceInstance } from '../../../lib/collections/PieceInstances'
 
 export namespace ServerPlayoutAPI {
@@ -440,7 +440,7 @@ export namespace ServerPlayoutAPI {
 	}
 	export function setNextPartInner (
 		rundown: Rundown,
-		nextPartId: string | DBPart | null,
+		nextPartId: string | DBPart | DBPartInstance | null,
 		setManually?: boolean,
 		nextTimeOffset?: number | undefined
 	) {
@@ -448,7 +448,7 @@ export namespace ServerPlayoutAPI {
 
 		if (rundown.holdState && rundown.holdState !== RundownHoldState.COMPLETE) throw new Meteor.Error(501, `Rundown "${rundown._id}" cannot change next during hold!`)
 
-		let nextPart: DBPart | null = null
+		let nextPart: DBPart | DBPartInstance | null = null
 		if (nextPartId) {
 			if (_.isString(nextPartId)) {
 				nextPart = Parts.findOne(nextPartId) || null
@@ -659,34 +659,26 @@ export namespace ServerPlayoutAPI {
 
 			// logger.info('nowInPart', nowInPart)
 			// logger.info('filteredPieces', filteredPieces)
-			let getNextPiece = (part: Part, undo?: boolean) => {
+			let getNextPiece = (partInstance: PartInstance, undo?: boolean) => {
 				// Find next piece to disable
 
 				let nowInPart = 0
-				if (
-					part.startedPlayback &&
-					part.timings &&
-					part.timings.startedPlayback
-				) {
-					let lastStartedPlayback = _.last(part.timings.startedPlayback)
-
-					if (lastStartedPlayback) {
-						nowInPart = getCurrentTime() - lastStartedPlayback
-					}
+				if (partInstance.timings.startedPlayback) {
+					nowInPart = getCurrentTime() - partInstance.timings.startedPlayback
 				}
 
-				let pieces: Array<PieceResolved> = getOrderedPiece(part)
+				let pieces: Array<PieceResolved> = getOrderedPiece(partInstance, partInstance.getAllPieceInstances())
 
 				let findLast: boolean = !!undo
 
 				let filteredPieces = _.sortBy(
 					_.filter(pieces, (piece: PieceResolved) => {
-						let sourceLayer = allowedSourceLayers[piece.sourceLayerId]
-						if (sourceLayer && sourceLayer.allowDisable && !piece.virtual) return true
+						let sourceLayer = allowedSourceLayers[piece.piece.sourceLayerId]
+						if (sourceLayer && sourceLayer.allowDisable && !piece.piece.virtual) return true
 						return false
 					}),
 					(piece: PieceResolved) => {
-						let sourceLayer = allowedSourceLayers[piece.sourceLayerId]
+						let sourceLayer = allowedSourceLayers[piece.piece.sourceLayerId]
 						return sourceLayer._rank || -9999
 					}
 				)
@@ -710,20 +702,20 @@ export namespace ServerPlayoutAPI {
 				return nextPiece
 			}
 
-			if (nextPart) {
+			if (nextPartInstance) {
 				// pretend that the next part never has played (even if it has)
-				nextPart.startedPlayback = false
+				delete nextPartInstance.timings.startedPlayback
 			}
 
-			let sls = [
-				currentPart,
-				nextPart // If not found in currently playing part, let's look in the next one:
+			let partInstances = [
+				currentPartInstance,
+				nextPartInstance // If not found in currently playing part, let's look in the next one:
 			]
-			if (undo) sls.reverse()
+			if (undo) partInstances.reverse()
 
 			let nextPiece: PieceResolved | undefined
 
-			_.each(sls, (part) => {
+			_.each(partInstances, (part) => {
 				if (part && !nextPiece) {
 					nextPiece = getNextPiece(part, undo)
 				}
@@ -1060,37 +1052,36 @@ export namespace ServerPlayoutAPI {
 
 			const now = getCurrentTime()
 			const relativeNow = now - partInstance.timings.startedPlayback
-			const orderedPieces = getResolvedPieces(part)
+			const orderedPieces = getResolvedPieces(partInstance)
 
-			orderedPieces.forEach((piece) => {
-				if (piece.sourceLayerId === sourceLayerId) {
-					if (!piece.userDuration) {
+			orderedPieces.forEach((pieceInstance) => {
+				if (pieceInstance.piece.sourceLayerId === sourceLayerId) {
+					if (!pieceInstance.userDuration) {
 						let newExpectedDuration: number | undefined = undefined
 
-						if (piece.infiniteId && piece.infiniteId !== piece._id && partInstance) {
+						if (pieceInstance.piece.infiniteId && pieceInstance.piece.infiniteId !== pieceInstance.piece._id && partInstance) {
 							const partStarted = partInstance.timings.startedPlayback
 							if (partStarted) {
 								newExpectedDuration = now - partStarted
 							}
 						} else if (
-							piece.startedPlayback && // currently playing
-							_.isNumber(piece.enable.start) &&
-							(piece.enable.start || 0) < relativeNow && // is relative, and has started
-							!piece.stoppedPlayback // and not yet stopped
+							pieceInstance.timings.startedPlayback && // currently playing
+							_.isNumber(pieceInstance.piece.enable.start) &&
+							(pieceInstance.piece.enable.start || 0) < relativeNow && // is relative, and has started
+							!pieceInstance.timings.stoppedPlayback // and not yet stopped
 						) {
-							newExpectedDuration = now - piece.startedPlayback
+							newExpectedDuration = now - pieceInstance.timings.startedPlayback
 						}
 
 						if (newExpectedDuration !== undefined) {
-							console.log(`Cropping piece "${piece._id}" at ${newExpectedDuration}`)
+							console.log(`Cropping pieceInstance "${pieceInstance._id}" at ${newExpectedDuration}`)
 
-							Pieces.update({
-								_id: piece._id
+							PieceInstances.update({
+								_id: pieceInstance._id
 							}, {
 								$set: {
-									userDuration: {
-										duration: newExpectedDuration
-									}
+									// TODO - this field doesnt exist yet..
+									userDuration: newExpectedDuration
 								}
 							})
 						}
