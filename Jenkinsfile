@@ -19,10 +19,10 @@ pipeline {
     }
     stage('Deploy') {
       when {		
-        branch 'stage'		
+        branch 'develop'		
       }
       steps {
-        coreDeploy()
+        coreDeploy('malxsofietest02')
       }
     }
   }
