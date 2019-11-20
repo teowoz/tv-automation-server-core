@@ -90,6 +90,7 @@ export function setNext (rundownId: string, nextPartId: string | null, setManual
 		if (!nextPart) throw new Meteor.Error(404, `Part "${nextPartId}" not found!`)
 
 		if (nextPart.invalid) return ClientAPI.responseError('Part is marked as invalid, cannot set as next.')
+		// TODO: ignore floated parts as well
 	}
 
 	if (rundown.holdState && rundown.holdState !== RundownHoldState.COMPLETE) {

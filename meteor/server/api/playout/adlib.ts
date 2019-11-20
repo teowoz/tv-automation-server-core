@@ -106,6 +106,7 @@ export namespace ServerPlayoutAdLibAPI {
 				rundownId: rundownId
 			})
 			if (!adLibPiece) throw new Meteor.Error(404, `Part Ad Lib Item "${adLibPieceId}" not found!`)
+			// TODO: floated
 			if (adLibPiece.invalid) throw new Meteor.Error(404, `Cannot take invalid Part Ad Lib Item "${adLibPieceId}"!`)
 
 			if (!queue && rundown.currentPartId !== partId) throw new Meteor.Error(403, `Part AdLib-pieces can be only placed in a currently playing part!`)

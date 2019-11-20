@@ -273,6 +273,7 @@ export const DashboardPanel = translateWithTracker<IAdLibPanelProps & IDashboard
 	onToggleAdLib = (piece: AdLibPieceUi, queue: boolean, e: any) => {
 		const { t } = this.props
 
+		// TODO: floated
 		if (piece.invalid) {
 			NotificationCenter.push(new Notification(
 				t('Invalid AdLib'),

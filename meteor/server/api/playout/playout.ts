@@ -558,6 +558,7 @@ export namespace ServerPlayoutAPI {
 		let part = parts[partIndex]
 		if (!part) throw new Meteor.Error(501, `Part index ${partIndex} not found in list of parts!`)
 
+		// TODO: floated
 		if ((part._id === rundown.currentPartId && !nextPartId0) || part.invalid) {
 			// Whoops, we're not allowed to next to that.
 			// Skip it, then (ie run the whole thing again)

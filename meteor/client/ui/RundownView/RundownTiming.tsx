@@ -351,6 +351,7 @@ withTracker<IRundownTimingProviderProps, IRundownTimingProviderState, IRundownTi
 					partDisplayDuration = this.props.defaultDuration || DEFAULT_DURATION
 					this.partPlayed[part._id] = 0
 				}
+				// Floated parts should be ignored completely
 
 				if (memberOfDisplayDurationGroup && part.displayDurationGroup) {
 					this.displayDurationGroups[part.displayDurationGroup] =

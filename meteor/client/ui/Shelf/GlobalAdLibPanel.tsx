@@ -439,6 +439,7 @@ export const GlobalAdLibPanel = translateWithTracker<IProps, IState, ITrackedPro
 	onToggleAdLib = (piece: AdLibPieceUi, queue: boolean, e: any) => {
 		const { t } = this.props
 
+		// TODO: floated
 		if (piece.invalid) {
 			NotificationCenter.push(new Notification(t('Invalid AdLib'), NoticeLevel.WARNING, t('Cannot play this AdLib becasue it is marked as Invalid'), 'toggleAdLib'))
 			return

@@ -171,6 +171,7 @@ export function setNextPart (
 		if (nextPart._id === rundown.currentPartId) {
 			throw new Meteor.Error(402, 'Not allowed to Next the currently playing Part')
 		}
+		// TODO: floated
 		if (nextPart.invalid) {
 			throw new Meteor.Error(400, 'Part is marked as invalid, cannot set as next.')
 		}
