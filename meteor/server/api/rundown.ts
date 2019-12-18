@@ -25,7 +25,7 @@ import { ShowStyleVariants, ShowStyleVariant } from '../../lib/collections/ShowS
 import { ShowStyleBases, ShowStyleBase } from '../../lib/collections/ShowStyleBases'
 import { Blueprints } from '../../lib/collections/Blueprints'
 import { Studios, Studio } from '../../lib/collections/Studios'
-import { IngestRundown } from 'tv-automation-sofie-blueprints-integration'
+import { IngestRundown, ConfigManifestEntry, IConfigItem } from 'tv-automation-sofie-blueprints-integration'
 import { StudioConfigContext } from './blueprints/context'
 import { loadStudioBlueprints, loadShowStyleBlueprints } from './blueprints/cache'
 import { PackageInfo } from '../coreSystem'
@@ -328,6 +328,39 @@ export namespace ClientRundownAPI {
 
 		return undefined
 	}
+	// Validate the blueprint config used for this rundown, to ensure that all the required fields are specified
+	export function validateBlueprintConfig (rundownId: string) {
+		check(rundownId, String)
+
+		const rundown = Rundowns.findOne(rundownId)
+		if (!rundown) throw new Meteor.Error(404, `Rundown "${rundownId}" not found!`)
+
+		const studio = rundown.getStudio()
+		const studioBlueprint = Blueprints.findOne(studio.blueprintId)
+		if (!studioBlueprint) throw new Meteor.Error(404, `Studio blueprint "${studio.blueprintId}" not found!`)
+
+		const showStyle = rundown.getShowStyleCompound()
+		const showStyleBlueprint = Blueprints.findOne(showStyle.blueprintId)
+		if (!showStyleBlueprint) throw new Meteor.Error(404, `ShowStyle blueprint "${showStyle.blueprintId}" not found!`)
+
+		const findMissingConfigs = (manifest: ConfigManifestEntry[], config: IConfigItem[]) => {
+			const missingKeys: string[] = []
+
+			const configKeys = _.map(config, c => c._id)
+			_.each(manifest, m => {
+				if (m.required && configKeys.indexOf(m.id) === -1) {
+					missingKeys.push(m.name)
+				}
+			})
+
+			return missingKeys
+		}
+
+		return {
+			studio: findMissingConfigs(studioBlueprint.studioConfigManifest || [], studio.config),
+			showStyle: findMissingConfigs(showStyleBlueprint.showStyleConfigManifest || [], showStyle.config)
+		}
+	}
 }
 
 let methods: Methods = {}
@@ -342,6 +375,9 @@ methods[RundownAPI.methods.unsyncRundown] = (rundownId: string) => {
 }
 methods[RundownAPI.methods.rundownNeedsUpdating] = (rundownId: string) => {
 	return ClientRundownAPI.rundownNeedsUpdating(rundownId)
+}
+methods[RundownAPI.methods.validateBlueprintConfig] = (rundownId: string) => {
+	return ClientRundownAPI.validateBlueprintConfig(rundownId)
 }
 // Apply methods:
 setMeteorMethods(methods)
