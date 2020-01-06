@@ -493,7 +493,6 @@ class RundownViewNotifier extends WithManagedTracker {
 
 		// Verify the showstyle & studio config look good
 		Meteor.call(RundownAPI.methods.validateBlueprintConfig, rundownId, (err: Error, configErrors: { studio: string[], showStyle: string[] } | undefined) => {
-			console.log(configErrors)
 			let newStudioNotification: Notification | undefined = undefined
 			let newShowStyleNotification: Notification | undefined = undefined
 			if (err) {

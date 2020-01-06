@@ -32,6 +32,7 @@ import { PackageInfo } from '../coreSystem'
 import { UpdateNext } from './ingest/updateNext'
 import { UserActionAPI } from '../../lib/api/userActions'
 import { IngestActions } from './ingest/actions'
+import { findMissingConfigs } from './blueprints/config'
 
 export function selectShowStyleVariant (studio: Studio, ingestRundown: IngestRundown): { variant: ShowStyleVariant, base: ShowStyleBase } | null {
 	if (!studio.supportedShowStyleBase.length) {
@@ -342,19 +343,6 @@ export namespace ClientRundownAPI {
 		const showStyle = rundown.getShowStyleCompound()
 		const showStyleBlueprint = Blueprints.findOne(showStyle.blueprintId)
 		if (!showStyleBlueprint) throw new Meteor.Error(404, `ShowStyle blueprint "${showStyle.blueprintId}" not found!`)
-
-		const findMissingConfigs = (manifest: ConfigManifestEntry[], config: IConfigItem[]) => {
-			const missingKeys: string[] = []
-
-			const configKeys = _.map(config, c => c._id)
-			_.each(manifest, m => {
-				if (m.required && configKeys.indexOf(m.id) === -1) {
-					missingKeys.push(m.name)
-				}
-			})
-
-			return missingKeys
-		}
 
 		return {
 			studio: findMissingConfigs(studioBlueprint.studioConfigManifest || [], studio.config),

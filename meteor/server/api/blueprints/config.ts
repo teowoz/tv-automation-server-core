@@ -1,5 +1,5 @@
 import * as _ from 'underscore'
-import { ConfigItemValue } from 'tv-automation-sofie-blueprints-integration'
+import { ConfigItemValue, ConfigManifestEntry, IConfigItem } from 'tv-automation-sofie-blueprints-integration'
 import { Studios, Studio } from '../../../lib/collections/Studios'
 import { Meteor } from 'meteor/meteor'
 import { getShowStyleCompound } from '../../../lib/collections/ShowStyleVariants'
@@ -82,4 +82,17 @@ export function compileStudioConfig (studio: Studio) {
 	res['SofieHostURL'] = studio.settings.sofieUrl
 
 	return res
+}
+
+export function findMissingConfigs (manifest: ConfigManifestEntry[], config: IConfigItem[]) {
+	const missingKeys: string[] = []
+
+	const configKeys = _.map(config, c => c._id)
+	_.each(manifest, m => {
+		if (m.required && configKeys.indexOf(m.id) === -1) {
+			missingKeys.push(m.name)
+		}
+	})
+
+	return missingKeys
 }
