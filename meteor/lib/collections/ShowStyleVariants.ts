@@ -22,6 +22,11 @@ export function getShowStyleCompound (showStyleVariantId: string): ShowStyleComp
 	let showStyleBase = ShowStyleBases.findOne(showStyleVariant.showStyleBaseId)
 	if (!showStyleBase) return undefined
 
+	return createShowStyleCompound(showStyleBase, showStyleVariant)
+}
+export function createShowStyleCompound (showStyleBase: ShowStyleBase, showStyleVariant: ShowStyleVariant): ShowStyleCompound | undefined {
+	if (showStyleBase._id !== showStyleVariant.showStyleBaseId) return undefined
+
 	let configs: {[id: string]: IConfigItem} = {}
 	_.each(showStyleBase.config, (config: IConfigItem) => {
 		configs[config._id] = config

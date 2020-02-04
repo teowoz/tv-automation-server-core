@@ -345,8 +345,8 @@ export namespace ClientRundownAPI {
 		if (!showStyleBlueprint) throw new Meteor.Error(404, `ShowStyle blueprint "${showStyle.blueprintId}" not found!`)
 
 		return {
-			studio: findMissingConfigs(studioBlueprint.studioConfigManifest || [], studio.config),
-			showStyle: findMissingConfigs(showStyleBlueprint.showStyleConfigManifest || [], showStyle.config)
+			studio: findMissingConfigs(studioBlueprint.studioConfigManifest, studio.config),
+			showStyle: findMissingConfigs(showStyleBlueprint.showStyleConfigManifest, showStyle.config)
 		}
 	}
 }
