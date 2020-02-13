@@ -60,6 +60,7 @@
     "meteor-node-stubs": "^0.3.3",
     "moment": "^2.19.1",
     "mos-connection": "^0.7.0",
+    "node-expat": "^2.3.18",
     "ntp-client": "^0.5.3",
     "object-path": "^0.11.4",
     "prop-types": "^15.6.1",
