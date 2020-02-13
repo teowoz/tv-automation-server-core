@@ -17,3 +17,13 @@ export abstract class ControllerAbstract {
 	public abstract onMouseKeyUp (e: MouseEvent): void
 	public abstract onWheel (e: WheelEvent): void
 }
+
+export interface PrompterControlInterface {
+	startScrollingDown(): void
+	startScrollingUp(): void
+	stopScrolling(): void
+	stopScrollingDown(): void
+	stopScrollingUp(): void
+	nudge(delta: number): void
+	changeScrollingSpeed(delta: number): void
+}

@@ -4,6 +4,8 @@ import { ControllerAbstract } from './lib'
 import { ShuttleKeyboardController } from './shuttle-keyboard-device'
 import * as _ from 'underscore'
 import { KeyboardController } from './keyboard-device'
+import { ExternalController } from './external-device'
+import { connectGearVRController } from './external/gear-vr-controller'
 
 export class PrompterControlManager {
 	private _view: PrompterViewInner
@@ -26,6 +28,11 @@ export class PrompterControlManager {
 
 		} else if (this._view.configOptions.mode === PrompterConfigMode.SHUTTLEKEYBOARD) {
 			this._controllers.push(new ShuttleKeyboardController(this._view))
+
+		} else if (this._view.configOptions.mode == PrompterConfigMode.GEARVR) {
+			let ec = new ExternalController(this._view)
+			connectGearVRController(ec)
+			this._controllers.push(ec)
 
 		} else {
 			// Default behaviour:
