@@ -110,7 +110,8 @@ The prompter can be controlled by different types of controllers. Which mode is 
 |  Default                  | Controlled by both mouse and keyboard                                                           |
 | `?mode=mouse`             | Controlled by mouse only                                                                        |
 | `?mode=keyboard`          | Controlled by keyboard only                                                                     |
-| `?mode=shuttlekeyboard`   | Controlled by a Contour-ShuttleXpress or X-keys, configured as keyboard-inputs (see below)       |
+| `?mode=shuttlekeyboard`   | Controlled by a Contour-ShuttleXpress or X-keys, configured as keyboard-inputs (see below)      |
+| `?mode=gearvr`            | Controlled by Samsung Gear VR controller connected with Bluetooth                               |
 
 ### Customize looks
 
@@ -162,6 +163,23 @@ Config-files to be used in respective config software:
 * [Contour ShuttleXpress](resources/prompter_layout_shuttlexpress.pref)
 * [X-keys](resources/prompter_layout_xkeys.mw3)
 
+
+### Control using Samsung Gear VR Controller
+
+You'll need BLE-enabled Bluetooth transceiver and Web-Bluetooth support in browser. It was tested in Chromium. Some platforms require enabling it explicitly. [See the compatibility table here.](https://github.com/WebBluetoothCG/web-bluetooth/blob/master/implementation-status.md)
+
+When prompter page is loaded, you need to click anywhere on it, because browsers block showing pairing dialog when the action isn't initiated by the user.
+
+| Controller button | Prompter action |
+|-------------------|-----------------|
+| Trigger           | Enable speed change (see below) |
+| Back              | Stop scrolling  |
+| Volume up (+)     | Start scrolling up |
+| Volume down (-)   | Start scrolling down |
+
+By pressing volume up/down button, automatic scrolling is enabled. You can change the speed by holding the trigger button (the one behind the touchpad) and moving your finger on the touchpad circularly, near the edge.
+
+When the trigger button isn't pressed, touchpad can be used to scroll - it works like smartphone touch screens we're all used to.
 
 # For developers
 
