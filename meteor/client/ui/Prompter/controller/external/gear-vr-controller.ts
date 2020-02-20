@@ -93,7 +93,6 @@ class GearVRController extends EventEmitter {
     }
 
     protected _ensureConnected(): void {
-        
         if (!this.connected) {
             throw new Error("Not connected!")
         }
@@ -109,13 +108,17 @@ class GearVRController extends EventEmitter {
         try {
             await this._runCommand(GearVRController.Commands.POWER_OFF)
         } finally {
-            this._ensureConnected()
-            this._gattServer!.disconnect()
-            this._writeCharacteristic = null
-            this._notifyCharacteristic = null
-            this._primaryService = null
-            this._gattServer = null
-            this.transient = false
+            try {
+                this._ensureConnected()
+                this._gattServer!.disconnect()
+            } finally {
+                this._resetStates()
+                this._writeCharacteristic = null
+                this._notifyCharacteristic = null
+                this._primaryService = null
+                this._gattServer = null
+                this.transient = false
+            }
         }
     }
 
@@ -131,7 +134,6 @@ class GearVRController extends EventEmitter {
     }
 
     protected async _subscribeToSensors(): Promise<void> {
-        this._ensureConnected()
         await this._runCommand(GearVRController.Commands.VR_MODE)
         await this._runCommand(GearVRController.Commands.SENSORS_MODE)
     }
@@ -197,7 +199,7 @@ export function connectGearVRController (ec: ExternalController): void {
             await gear.connect()
         } catch (err) {
             console.warn("connect to controller failed, user action required?", err)
-            window.document.addEventListener('click', async () => {
+            window.document.addEventListener('click', () => {
                 if (!gear.connected) {
                     gear.connect()
                 }
