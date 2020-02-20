@@ -173,6 +173,7 @@ When prompter page is loaded, you need to click anywhere on it, because browsers
 | Controller button | Prompter action |
 |-------------------|-----------------|
 | Trigger           | Enable speed change (see below) |
+| Home              | Go to live, stop if scrolling up |
 | Back              | Stop scrolling  |
 | Volume up (+)     | Start scrolling up |
 | Volume down (-)   | Start scrolling down |

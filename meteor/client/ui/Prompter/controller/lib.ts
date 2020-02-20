@@ -26,6 +26,7 @@ export interface PrompterControlInterface {
 	stopScrollingUp(): void
 	stopManualScrolling(): void
 	continueScrolling(): void
+	moveToLive(): void
 	nudge(delta: number): void
 	changeScrollingSpeed(delta: number): void
 }

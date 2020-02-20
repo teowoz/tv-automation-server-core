@@ -284,14 +284,17 @@ class GearToExternalControllerMediator {
             console.debug('Button down: ' + button)
             switch(button) {
                 case GearControllerButton.VOL_DOWN:
-                    ec.startScrollingDown();
-                    break;
+                    ec.startScrollingDown()
+                    break
                 case GearControllerButton.VOL_UP:
-                    ec.startScrollingUp();
-                    break;
+                    ec.startScrollingUp()
+                    break
                 case GearControllerButton.BACK:
-                    ec.stopScrolling();
-                    break;
+                    ec.stopScrolling()
+                    break
+                case GearControllerButton.HOME:
+                    ec.moveToLive()
+                    break
                 default:
             }
         })

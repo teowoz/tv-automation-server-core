@@ -107,7 +107,12 @@ export class ExternalController extends ControllerAbstract implements PrompterCo
 		}
 		this._nudgeLowPass.reset()
 	}
-
+	public moveToLive() {
+		// after moving to live, allow only scrolling down (or not scrolling at all)
+		this.stopManualScrolling()
+		this.stopScrollingUp()
+		this._prompterView.scrollToLive()
+	}
 	public nudge (delta: number) {
 		let delta2: number = delta * this.nudgeMultiplier
 		delta2 = this._nudgeLowPass.feed(delta2)
