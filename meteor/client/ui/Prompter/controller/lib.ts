@@ -24,6 +24,30 @@ export interface PrompterControlInterface {
 	stopScrolling(): void
 	stopScrollingDown(): void
 	stopScrollingUp(): void
+	stopManualScrolling(): void
+	continueScrolling(): void
 	nudge(delta: number): void
 	changeScrollingSpeed(delta: number): void
+}
+
+export class LowPassFilter {
+	last: number = 0
+	hasLast: boolean = false
+	smoothing: number
+	constructor(smoothing: number) {
+		this.smoothing = smoothing
+	}
+	feed(x: number): number {
+		if (this.hasLast) {
+			this.last = this.last*this.smoothing + x*(1-this.smoothing)
+		} else {
+			this.last = x
+		}
+		this.hasLast = true
+		return this.last
+	}
+	reset(): void {
+		this.hasLast = false
+		this.last = 0
+	}
 }

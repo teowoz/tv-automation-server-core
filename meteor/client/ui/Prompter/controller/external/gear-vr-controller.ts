@@ -12,7 +12,7 @@ enum GearControllerButton {
     VOL_DOWN = 'volDown'
 }
 
-interface TouchPadEvent {
+interface TouchPadPosition {
     x: number
     y: number
 }
@@ -20,7 +20,8 @@ interface TouchPadEvent {
 declare interface GearVRController {
     on(event: 'buttondown', listener: (button: GearControllerButton) => void): this
     on(event: 'buttonup', listener: (button: GearControllerButton) => void): this
-    on(event: 'touchpadmove', listener: (e: TouchPadEvent) => void): this
+    on(event: 'touch', listener: (position: TouchPadPosition) => void): this
+    on(event: 'touchrelease', listener: () => void): this
     on(event: string, listener: Function): this
 }
 
@@ -46,6 +47,11 @@ class GearVRController extends EventEmitter {
     protected _writeCharacteristic: BluetoothRemoteGATTCharacteristic | null = null
 
     buttonStates: Map<GearControllerButton, boolean> = new Map()
+    touchPosition: TouchPadPosition | null = null
+    get touched() {
+        return this.touchPosition!=null
+    }
+
     transient: boolean = false
 
     async connect(): Promise<void> {
@@ -65,6 +71,8 @@ class GearVRController extends EventEmitter {
             if (device.gatt===undefined) {
                 throw new Error("Bluetooth GATT not available")
             }
+            console.info("User chose device, connecting...")
+
             this._gattServer = await device.gatt.connect()
             console.debug("GATT server ready")
             
@@ -78,7 +86,8 @@ class GearVRController extends EventEmitter {
             console.debug("Started notifications")
 
             await this._subscribeToSensors()
-            console.debug("Subscribed to sensors. Connect done.")
+            console.debug("Subscribed to sensors.")
+            console.info("Connected")
         } finally {
             this.transient = false
         }
@@ -131,6 +140,7 @@ class GearVRController extends EventEmitter {
         for (let btn of Object.values(GearControllerButton)) {
             this.buttonStates[btn] = false
         }
+        this.touchPosition = null
     }
 
     protected async _subscribeToSensors(): Promise<void> {
@@ -142,6 +152,7 @@ class GearVRController extends EventEmitter {
         const { buffer } = e.target.value;
         const bytes = new Uint8Array(buffer);
 
+        // handle buttons:
         const s = (button: GearControllerButton, bit_offset: number): void => {
             this._setButtonState(button, (bytes[58] & (1 << bit_offset)) != 0)
         }
@@ -151,6 +162,23 @@ class GearVRController extends EventEmitter {
         s(GearControllerButton.TOUCHPAD, 3)
         s(GearControllerButton.VOL_UP, 4)
         s(GearControllerButton.VOL_DOWN, 5)
+
+        // get raw coordinates in range 0..315:
+        const rawX = ((bytes[54] & 0xF) << 6) | ((bytes[55] & 0xFC) >> 2)
+        const rawY = ((bytes[55] & 0x3) << 8) |  (bytes[56] & 0xFF)
+
+        if (rawX && rawY) {
+            // convert to range -1..1:
+            this.touchPosition = {x: rawX / 157.5 - 1.0, y: rawY / 157.5 - 1.0}
+            this.emit('touch', this.touchPosition)
+        } else {
+            const wasTouched = this.touched
+            this.touchPosition = null
+            if (wasTouched) {
+                this.emit('touchrelease')
+            }
+        }
+
     }
 
     protected _setButtonState(button: GearControllerButton, pressed: boolean): void {
@@ -166,12 +194,92 @@ class GearVRController extends EventEmitter {
     }
 }
 
+class TouchPadMoveEvent {
+    protected static readonly EPSILON = 0.001
+    deltaX: number
+    deltaY: number
+    constructor(deltaX: number, deltaY: number) {
+        this.deltaX = deltaX
+        this.deltaY = deltaY
+    }
+    get isSignificant(): boolean {
+        return Math.abs(this.deltaX) > TouchPadMoveEvent.EPSILON || Math.abs(this.deltaY) > TouchPadMoveEvent.EPSILON
+    }
+}
+
+interface PolarCoordinates {
+    radius: number
+    angle: number
+}
+
+interface TouchPadEdgeRotateEvent {
+    radius: number
+    deltaAngle: number
+}
+
+declare interface TouchHandler {
+    on(event: 'move', listener: (e: TouchPadMoveEvent) => void): this
+    on(event: 'movestop', listener: () => void): this
+    on(event: 'edgerotate', listener: (e: TouchPadEdgeRotateEvent) => void): this
+    on(event: string, listener: Function): this
+}
+
+class TouchHandler extends EventEmitter {
+    protected _prevPosition: TouchPadPosition | null = null
+    protected _wasMoving: boolean = false
+    handleTouch(pos: TouchPadPosition) {
+        if (this._prevPosition!=null) {
+            const moveEvent = new TouchPadMoveEvent(pos.x - this._prevPosition.x,
+                                                    pos.y - this._prevPosition.y)
+            if (!moveEvent.isSignificant) {
+                if (this._wasMoving) {
+                    this.emit('movestop')
+                    this._wasMoving = false
+                }
+                return
+            }
+            this._wasMoving = true
+            this.emit('move', moveEvent)
+            if (this.listenerCount('edgerotate')) {
+                const { radius, angle } = this._positionToPolar(pos)
+                if (radius > 0.7) {
+                    const { angle: prevAngle } = this._positionToPolar(this._prevPosition)
+                    let deltaAngle: number = angle - prevAngle
+                    if (deltaAngle >= Math.PI) {
+                        deltaAngle -= 2*Math.PI
+                    } else if (deltaAngle <= -Math.PI) {
+                        deltaAngle += 2*Math.PI
+                    }
+                    this.emit('edgerotate', { radius, deltaAngle })
+                }
+            }
+        }
+        this._prevPosition = pos
+    }
+    handleRelease() {
+        this._prevPosition = null
+    }
+    _positionToPolar(pos: TouchPadPosition): PolarCoordinates {
+        return {
+            radius: Math.sqrt(pos.x*pos.x + pos.y*pos.y),
+            angle: Math.atan2(pos.y, pos.x)
+        }
+    }
+    connectToController(controller: GearVRController) {
+        controller.on('touch', this.handleTouch.bind(this))
+        controller.on('touchrelease', this.handleRelease.bind(this))
+    }
+}
+
 class GearToExternalControllerMediator {
     protected _ec: ExternalController
     protected _gear: GearVRController
+    protected _touch: TouchHandler
     constructor(ec: ExternalController, gear: GearVRController) {
         this._ec = ec
         this._gear = gear
+        this._touch = new TouchHandler()
+        this._touch.connectToController(gear)
         gear.on('buttondown', (button: GearControllerButton) => {
             console.debug('Button down: ' + button)
             switch(button) {
@@ -185,6 +293,26 @@ class GearToExternalControllerMediator {
                     ec.stopScrolling();
                     break;
                 default:
+            }
+        })
+        this._touch.on('move', (ev) => {
+            console.debug('Move on touchpad', ev)
+            if (!gear.buttonStates[GearControllerButton.TRIGGER]) {
+                ec.nudge(ev.deltaY)
+            }
+        })
+        this._touch.on('movestop', () => {
+            console.debug('move stop')
+            ec.stopManualScrolling()
+        })
+        gear.on('touchrelease', () => {
+            console.debug('touch release')
+            ec.continueScrolling()
+        })
+        this._touch.on('edgerotate', (ev) => {
+            console.debug('Rotate on touchpad edge', ev)
+            if (gear.buttonStates[GearControllerButton.TRIGGER]) {
+                ec.changeScrollingSpeed(ev.deltaAngle)
             }
         })
     }

@@ -1,4 +1,4 @@
-import { ControllerAbstract, PrompterControlInterface } from './lib'
+import { ControllerAbstract, PrompterControlInterface, LowPassFilter } from './lib'
 import { PrompterViewInner } from '../PrompterView'
 import { NotificationCenter, Notification, NoticeLevel } from '../../../lib/notifications/notifications'
 
@@ -17,23 +17,29 @@ export class ExternalController extends ControllerAbstract implements PrompterCo
 	private _prompterView: PrompterViewInner
 
 	/** scroll speed, in pixels per frame */
+	private _autoScrollSpeed: number = 4
 	private _scrollSpeedTarget: number = 4
 	private _scrollSpeedCurrent: number = 0
 	private _scrollingDown: boolean = false
 	private _scrollingUp: boolean = false
+	private _scrollingManual: boolean = false
 	private _updateSpeedHandle: number | null = null
 	private _scrollPosition: number = 0
 	private _scrollRest: number = 0
 	private _noMovement: number = 0
 	private _disableMouseWheel : boolean = false // TODO: make changeable
-	private _nudgeMultiplier : number = 1
 	private _toNudge: number = 0
+	private _nudgeLowPass: LowPassFilter = new LowPassFilter(0.8)
 
 	private _scrollDownDelta: number = 0
 	private _scrollDownDeltaTracker: number = 0
 
 	private _nextPausePosition: number | null = null
 	private _lastWheelTime: number = 0
+
+	nudgeMultiplier : number = -200
+	manualScrollingMultiplier : number = -30
+	manualScrollingInertia: number = 0.95 // 0-1 range, 1 for no resistance (scroll forever once started)
 
 	constructor(view: PrompterViewInner) {
 		super(view)
@@ -85,6 +91,7 @@ export class ExternalController extends ControllerAbstract implements PrompterCo
 	public stopScrolling() {
 		this._scrollingUp = false
 		this._scrollingDown = false
+		this._scrollingManual = false
 		this.triggerStartSpeedScrolling()
 	}
 	public stopScrollingDown() {
@@ -94,26 +101,37 @@ export class ExternalController extends ControllerAbstract implements PrompterCo
 		this._scrollingUp = false
 		this.triggerStartSpeedScrolling()
 	}
+	public stopManualScrolling() {
+		if ( (!this._scrollingDown) && (!this._scrollingUp) ) {
+			this._scrollSpeedTarget = 0
+		}
+		this._nudgeLowPass.reset()
+	}
 
 	public nudge (delta: number) {
-		let delta2: number = delta * this._nudgeMultiplier
+		let delta2: number = delta * this.nudgeMultiplier
+		delta2 = this._nudgeLowPass.feed(delta2)
 		if (this._updateSpeedHandle !== null) {
 			this._toNudge += delta2
 		} else {
 			window.scrollBy(0, delta2);
 		}
 	}
+	public continueScrolling() {
+		if ( (!this._scrollingDown) && (!this._scrollingUp) ) {
+			this._scrollingManual = true
+			this._scrollSpeedTarget = this._nudgeLowPass.last
+			this._startScrolling()
+		}
+		this._nudgeLowPass.reset()
+	}
 
 	public changeScrollingSpeed(delta: number) {
-		let delta2: number = Math.sign(delta) * Math.sqrt(Math.abs(delta) / 150)
-		if (Math.sign(this._scrollSpeedTarget) < 0) {
-			// Make scrolling up faster than down
-			delta2 *= 2
+		let delta2: number = delta * Math.max(1, this._autoScrollSpeed) * 0.1
+		this._autoScrollSpeed = Math.max(0.3, this._autoScrollSpeed + delta2) // allow only positive
+		if (this._scrollingDown || this._scrollingUp) {
+			this._scrollSpeedTarget = this._autoScrollSpeed
 		}
-		this._scrollSpeedTarget += delta2
-
-		this._scrollingDown = true
-
 		this.triggerStartSpeedScrolling()
 	}
 
@@ -126,6 +144,11 @@ export class ExternalController extends ControllerAbstract implements PrompterCo
 		} else {
 			this._nextPausePosition = null
 		}
+		this._scrollingManual = false
+		this._scrollSpeedTarget = this._autoScrollSpeed
+		this._startScrolling()
+	}
+	private _startScrolling() {
 		this._noMovement = 0
 		this._updateScrollPosition()
 	}
@@ -146,11 +169,14 @@ export class ExternalController extends ControllerAbstract implements PrompterCo
 			this._scrollingDown = false
 		}
 
+		if (this._scrollingManual) {
+			this._scrollSpeedTarget *= this.manualScrollingInertia
+		}
 		let targetSpeed = this._scrollSpeedTarget
 
 		if (this._scrollingUp) {
 			targetSpeed = -Math.sign(targetSpeed) * Math.max(10, Math.abs(targetSpeed) * 4)
-		} else if (this._scrollingDown) {
+		} else if (this._scrollingDown || this._scrollingManual) {
 			targetSpeed = targetSpeed * 1
 		} else {
 			targetSpeed = 0
@@ -170,7 +196,7 @@ export class ExternalController extends ControllerAbstract implements PrompterCo
 			this._scrollSpeedCurrent = targetSpeed
 		}
 
-		let speed = Math.round(this._scrollSpeedCurrent) // round because the scrolling is only done in full pizels anyway
+		let speed = Math.round(this._scrollSpeedCurrent) // round because the scrolling is only done in full pixels anyway
 		if (speed < 4) {
 			// save the rest, in order to scroll veeery slowly (sub-pixels)
 			this._scrollRest += Math.round((this._scrollSpeedCurrent - speed) * 6) / 6 // put the rest to use later
@@ -222,6 +248,10 @@ export class ExternalController extends ControllerAbstract implements PrompterCo
 				this._updateSpeedHandle = null
 				this._updateScrollPosition()
 			})
+		} else {
+			this._scrollingDown = false
+			this._scrollingUp = false
+			this._scrollingManual = false
 		}
 	}
 
