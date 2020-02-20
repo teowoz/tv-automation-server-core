@@ -220,6 +220,7 @@ interface TouchPadEdgeRotateEvent {
 declare interface TouchHandler {
     on(event: 'move', listener: (e: TouchPadMoveEvent) => void): this
     on(event: 'movestop', listener: () => void): this
+    on(event: 'tap', listener: () => void): this
     on(event: 'edgerotate', listener: (e: TouchPadEdgeRotateEvent) => void): this
     on(event: string, listener: Function): this
 }
@@ -227,19 +228,17 @@ declare interface TouchHandler {
 class TouchHandler extends EventEmitter {
     protected _prevPosition: TouchPadPosition | null = null
     protected _wasMoving: boolean = false
+    protected _movingStoppedTimeout: number | null = null
     handleTouch(pos: TouchPadPosition) {
         if (this._prevPosition!=null) {
             const moveEvent = new TouchPadMoveEvent(pos.x - this._prevPosition.x,
                                                     pos.y - this._prevPosition.y)
             if (!moveEvent.isSignificant) {
-                if (this._wasMoving) {
-                    this.emit('movestop')
-                    this._wasMoving = false
-                }
                 return
             }
             this._wasMoving = true
             this.emit('move', moveEvent)
+            this._delayMoveStop()
             if (this.listenerCount('edgerotate')) {
                 const { radius, angle } = this._positionToPolar(pos)
                 if (radius > 0.7) {
@@ -253,11 +252,33 @@ class TouchHandler extends EventEmitter {
                     this.emit('edgerotate', { radius, deltaAngle })
                 }
             }
+        } else {
+            // strictly speaking, it shouldn't be here because there was no move
+            // but we want to treat touching the touchpad without moving as movestop
+            this._delayMoveStop()
         }
         this._prevPosition = pos
     }
     handleRelease() {
+        this._clearMovingStoppedTimeout()
+        if (!this._wasMoving) {
+            this.emit('tap')
+        }
+        this._wasMoving = false
         this._prevPosition = null
+    }
+    _delayMoveStop() {
+        this._clearMovingStoppedTimeout()
+        this._movingStoppedTimeout = window.setTimeout(() => {
+            this.emit('movestop')
+            this._movingStoppedTimeout = null
+        }, 150)
+    }
+    _clearMovingStoppedTimeout() {
+        if (this._movingStoppedTimeout!=null) {
+            window.clearTimeout(this._movingStoppedTimeout)
+            this._movingStoppedTimeout = null
+        }
     }
     _positionToPolar(pos: TouchPadPosition): PolarCoordinates {
         return {
@@ -306,6 +327,10 @@ class GearToExternalControllerMediator {
         })
         this._touch.on('movestop', () => {
             console.debug('move stop')
+            ec.stopManualScrolling()
+        })
+        this._touch.on('tap', () => {
+            console.debug('touchpad tapped')
             ec.stopManualScrolling()
         })
         gear.on('touchrelease', () => {
