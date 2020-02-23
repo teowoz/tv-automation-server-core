@@ -22,6 +22,8 @@ declare interface GearVRController {
     on(event: 'buttonup', listener: (button: GearControllerButton) => void): this
     on(event: 'touch', listener: (position: TouchPadPosition) => void): this
     on(event: 'touchrelease', listener: () => void): this
+    on(event: 'connect', listener: () => void): this
+    on(event: 'disconnect', listener: () => void): this
     on(event: string, listener: Function): this
 }
 
@@ -45,6 +47,8 @@ class GearVRController extends EventEmitter {
     protected _primaryService: BluetoothRemoteGATTService | null = null
     protected _notifyCharacteristic: BluetoothRemoteGATTCharacteristic | null = null
     protected _writeCharacteristic: BluetoothRemoteGATTCharacteristic | null = null
+
+    protected _noDataTimeout: number | null = null
 
     buttonStates: Map<GearControllerButton, boolean> = new Map()
     touchPosition: TouchPadPosition | null = null
@@ -87,7 +91,8 @@ class GearVRController extends EventEmitter {
 
             await this._subscribeToSensors()
             console.debug("Subscribed to sensors.")
-            console.info("Connected")
+            console.info("Controller connected")
+            this.emit('connect')
         } finally {
             this.transient = false
         }
@@ -107,15 +112,24 @@ class GearVRController extends EventEmitter {
         }
     }
     protected _ensureNotTransient(): void {
+        // MAYBE TODO: maybe make it state machine and never throw exception in this case
+        // instead, reconnect after disconnecting or disconnect after connecting
         if (this.transient) {
             throw new Error("Now changing state! Try again later.")
         }
     }
 
-    async disconnect(): Promise<void> {
+    async disconnect(connectionDead: boolean = false): Promise<void> {
+        this._ensureNotTransient()
+        if (this._noDataTimeout!=null) {
+            window.clearTimeout(this._noDataTimeout)
+            this._noDataTimeout = null
+        }
         this.transient = true
         try {
-            await this._runCommand(GearVRController.Commands.POWER_OFF)
+            if (!connectionDead) {
+                await this._runCommand(GearVRController.Commands.POWER_OFF)
+            }
         } finally {
             try {
                 this._ensureConnected()
@@ -127,6 +141,8 @@ class GearVRController extends EventEmitter {
                 this._primaryService = null
                 this._gattServer = null
                 this.transient = false
+                console.info("Controller disconnected")
+                this.emit('disconnect')
             }
         }
     }
@@ -149,8 +165,16 @@ class GearVRController extends EventEmitter {
     }
 
     protected _onNotificationReceived(e): void {
-        const { buffer } = e.target.value;
-        const bytes = new Uint8Array(buffer);
+        if (this._noDataTimeout!=null) {
+            window.clearTimeout(this._noDataTimeout)
+        }
+        this._noDataTimeout = window.setTimeout(() => {
+            this._noDataTimeout = null
+            console.warn("No data from controller!")
+            this.disconnect(true)
+        }, 500)
+        const { buffer } = e.target.value
+        const bytes = new Uint8Array(buffer)
 
         // handle buttons:
         const s = (button: GearControllerButton, bit_offset: number): void => {
@@ -178,7 +202,6 @@ class GearVRController extends EventEmitter {
                 this.emit('touchrelease')
             }
         }
-
     }
 
     protected _setButtonState(button: GearControllerButton, pressed: boolean): void {
@@ -302,7 +325,6 @@ class GearToExternalControllerMediator {
         this._touch = new TouchHandler()
         this._touch.connectToController(gear)
         gear.on('buttondown', (button: GearControllerButton) => {
-            console.debug('Button down: ' + button)
             switch(button) {
                 case GearControllerButton.VOL_DOWN:
                     ec.startScrollingDown()
@@ -320,25 +342,20 @@ class GearToExternalControllerMediator {
             }
         })
         this._touch.on('move', (ev) => {
-            console.debug('Move on touchpad', ev)
             if (!gear.buttonStates[GearControllerButton.TRIGGER]) {
                 ec.nudge(ev.deltaY)
             }
         })
         this._touch.on('movestop', () => {
-            console.debug('move stop')
             ec.stopManualScrolling()
         })
         this._touch.on('tap', () => {
-            console.debug('touchpad tapped')
             ec.stopManualScrolling()
         })
         gear.on('touchrelease', () => {
-            console.debug('touch release')
             ec.continueScrolling()
         })
         this._touch.on('edgerotate', (ev) => {
-            console.debug('Rotate on touchpad edge', ev)
             if (gear.buttonStates[GearControllerButton.TRIGGER]) {
                 ec.changeScrollingSpeed(ev.deltaAngle)
             }
