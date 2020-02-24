@@ -51,6 +51,7 @@
     "core-js": "^2.5.4",
     "element-resize-event": "^3.0.3",
     "fast-clone": "^1.5.3",
+    "gear-vr-controller": "github:teowoz/gear-vr-controller#1.0.0",
     "html-entities": "^1.2.1",
     "i18next": "^11.2.3",
     "i18next-browser-languagedetector": "^2.2.0",
