@@ -60,10 +60,19 @@ interface IState {
 class PrompterNotificationSingleton {
 	private _prevSeverity: string | null = null
 	private _hideTimeout: number | null = null
+	private _deferredUpdate: CallableFunction | null = null
 	private _className = 'prompter-notification'
+	view: PrompterViewInner | null = null
 	render() {
+		if (this.view==null) {
+			throw Error("view not ready, this should never happen")
+		}
 		return (
-			<div className={this._className}>
+			<div className={this._className + ' hidden'}>
+				<div className='content' />
+				<div className='connect-instruction'>
+					{ this.view.props.t("Click anywhere on page or press Enter to connect.") }
+				</div>
 			</div>
 		)
 	}
@@ -73,17 +82,18 @@ class PrompterNotificationSingleton {
 	show(severity: string, text: string): PrompterNotificationSingleton {
 		this._clearHideTimeout()
 		const div = this.div
-		if (div==null) {
-			console.warn("Couldn't show " + severity + " message: " + text)
-			return this
+		if (div!=null) {
+			if (this._prevSeverity!=null) {
+				div.classList.remove(this._prevSeverity)
+			}
+			div.classList.add(severity)
+			div.classList.remove('hidden');
+			(div.querySelector('.content') as HTMLDivElement).innerText = text
+			this._prevSeverity = severity
+		} else {
+			//console.debug("Deferring showing " + severity + " message: " + text)
+			this._deferredUpdate = () => { this.show(severity, text) }
 		}
-		if (this._prevSeverity!=null) {
-			div.classList.remove(this._prevSeverity)
-		}
-		div.classList.add(severity)
-		div.classList.remove('hidden')
-		div.innerText = text
-		this._prevSeverity = severity
 		return this
 	}
 	hideAfter(ms: number): PrompterNotificationSingleton {
@@ -95,6 +105,8 @@ class PrompterNotificationSingleton {
 		this._clearHideTimeout()
 		if (this.div!=null) {
 			this.div.classList.add('hidden')
+		} else {
+			this._deferredUpdate = () => { this.hide() }
 		}
 		return this
 	}
@@ -102,6 +114,13 @@ class PrompterNotificationSingleton {
 		if (this._hideTimeout!=null) {
 			window.clearTimeout(this._hideTimeout)
 			this._hideTimeout = null
+		}
+	}
+	updateIfDeferred() {
+		if (this._deferredUpdate!=null) {
+			const toCall = this._deferredUpdate
+			this._deferredUpdate = null
+			toCall()
 		}
 	}
 }
@@ -146,6 +165,8 @@ export class PrompterViewInner extends MeteorReactComponent<Translated<IProps & 
 		}
 
 		this._controller = new PrompterControlManager(this)
+
+		PrompterNotification.view = this
 	}
 
 	componentWillMount () {
@@ -193,6 +214,7 @@ export class PrompterViewInner extends MeteorReactComponent<Translated<IProps & 
 	componentDidUpdate () {
 		this.triggerCheckCurrentTakeMarkers()
 		this.checkScrollToCurrent()
+		PrompterNotification.updateIfDeferred()
 	}
 
 	checkScrollToCurrent () {
@@ -528,6 +550,7 @@ export const Prompter = translateWithTracker<IPrompterProps, {}, IPrompterTracke
 
 	componentDidUpdate (prevProps, prevState, snapshot) {
 		this.restoreScrollAnchor(snapshot)
+		PrompterNotification.updateIfDeferred()
 	}
 
 	renderPrompterData (prompterData: PrompterData) {

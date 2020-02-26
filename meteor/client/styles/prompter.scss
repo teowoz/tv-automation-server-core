@@ -240,15 +240,31 @@ body.prompter-scrollbar {
             text-align: center;
             color: #000;
             z-index: 1;
+            .connect-instruction {
+                font-size: 50%;
+            }
 
             &.warning {
                 background: #f30;
             }
+            &.notice {
+                background: #ea0;
+            }
             &.info {
                 background: rgb(0, 206, 34);
             }
-            &.notice {
-                background: #ea0;
+            &.progress .content {
+                @keyframes gradualBlink {
+                    from { color: #000 }
+                    to { color: #888 }
+                }
+                background: #0ae;
+                animation: gradualBlink 1s alternate infinite;
+            }
+            &.info, &.progress {
+                .connect-instruction {
+                    display: none;
+                }
             }
 
             transition: opacity 0.2s;

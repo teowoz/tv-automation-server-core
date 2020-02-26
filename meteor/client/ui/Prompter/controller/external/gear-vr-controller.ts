@@ -171,6 +171,7 @@ export function connectGearVRController (ec: ExternalController, view: PrompterV
     const triggerConnect = async () => {
         if (!gear.connected) {
             try {
+                PrompterNotification.show('progress', t("Connecting ..."))
                 await gear.connect()
             } catch (err) {
                 console.error(err)
@@ -192,7 +193,7 @@ export function connectGearVRController (ec: ExternalController, view: PrompterV
         try {
             await gear.connect()
         } catch (err) {
-            PrompterNotification.show('notice', t("Click anywhere on page or press Enter to connect to the controller."))
+            PrompterNotification.show('notice', t("Ready to connect."))
         }
     })()
     
