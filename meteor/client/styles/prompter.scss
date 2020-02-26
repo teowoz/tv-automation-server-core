@@ -180,9 +180,6 @@ body.prompter-scrollbar {
 
         .take-indicator,
         .next-indicator {
-            position: absolute;
-            
-            
             width: 0; 
             height: 0; 
             
@@ -193,16 +190,23 @@ body.prompter-scrollbar {
             
             bottom: 0;
             margin-bottom: -1em;
-            opacity: 1;
-
-            transition: opacity 0.5s;
 
             &.top {
                 top: 0;
                 margin-top: -1em;
             }
+        }
+
+        .take-indicator,
+        .next-indicator,
+        .prompter-notification {
+            position: absolute;
+            
+            opacity: 1;
+            transition: opacity 0.5s;
+
             &.hidden {
-                opacity: 0
+                opacity: 0;
             }
         }
         .take-indicator {
@@ -224,6 +228,32 @@ body.prompter-scrollbar {
             &.top {
                 border-top: 1em solid transparent;
                 border-bottom: 1em solid #0f0;
+            }
+        }
+
+        .prompter-notification {
+            left: 0;
+            width: 100%;
+            border-radius: 0;
+            padding-left: 0.1em;
+            padding-right: 0.1em;
+            text-align: center;
+            color: #000;
+            z-index: 1;
+
+            &.warning {
+                background: #f30;
+            }
+            &.info {
+                background: rgb(0, 206, 34);
+            }
+            &.notice {
+                background: #ea0;
+            }
+
+            transition: opacity 0.2s;
+            &.hidden {
+                transition: opacity 1.5s;
             }
         }
     }

@@ -31,7 +31,7 @@ export class PrompterControlManager {
 
 		} else if (this._view.configOptions.mode == PrompterConfigMode.GEARVR) {
 			let ec = new ExternalController(this._view)
-			connectGearVRController(ec)
+			connectGearVRController(ec, this._view)
 			this._controllers.push(ec)
 
 		} else {

@@ -3,6 +3,7 @@
 import { EventEmitter } from 'events'
 import { ExternalController } from '../external-device'
 import { TouchPadPosition, GearControllerButton, GearVRController } from 'gear-vr-controller'
+import { PrompterViewInner, PrompterNotification } from '../../PrompterView'
 
 class TouchPadMoveEvent {
     protected static readonly EPSILON = 0.001
@@ -106,11 +107,22 @@ class GearToExternalControllerMediator {
     protected _ec: ExternalController
     protected _gear: GearVRController
     protected _touch: TouchHandler
-    constructor(ec: ExternalController, gear: GearVRController) {
+    constructor(ec: ExternalController, gear: GearVRController, view: PrompterViewInner) {
         this._ec = ec
         this._gear = gear
         this._touch = new TouchHandler()
         this._touch.connectToController(gear)
+
+        const { t } = view.props;
+
+        gear.on('connect', () => {
+            PrompterNotification.show('info', t("Controller connected."))
+            PrompterNotification.hideAfter(500)
+        })
+        gear.on('disconnect', () => {
+            PrompterNotification.show('warning', t("Controller disconnected!"))
+        })
+
         gear.on('buttondown', (button: GearControllerButton) => {
             switch(button) {
                 case GearControllerButton.VOL_DOWN:
@@ -150,20 +162,37 @@ class GearToExternalControllerMediator {
     }
 }
 
-export function connectGearVRController (ec: ExternalController): void {
+export function connectGearVRController (ec: ExternalController, view: PrompterViewInner): void {
     let gear = new GearVRController()
-    new GearToExternalControllerMediator(ec, gear);
+    new GearToExternalControllerMediator(ec, gear, view);
 
+    const { t } = view.props;
+
+    const triggerConnect = async () => {
+        if (!gear.connected) {
+            try {
+                await gear.connect()
+            } catch (err) {
+                console.error(err)
+                PrompterNotification.show('warning', t("Connecting failed!"))
+            }
+        }
+    }
+
+    // Register the connect function to be triggered by user
+    window.document.addEventListener('click', triggerConnect)
+    window.document.addEventListener('keypress', (ev) => {
+        if (ev.keyCode==13) {
+            triggerConnect()
+        }
+    });
+
+    // But first try to connect without user gesture, sometimes browsers allow it
     (async () => {
         try {
             await gear.connect()
         } catch (err) {
-            console.warn("connect to controller failed, user action required?", err)
-            window.document.addEventListener('click', () => {
-                if (!gear.connected) {
-                    gear.connect()
-                }
-            })
+            PrompterNotification.show('notice', t("Click anywhere on page or press Enter to connect to the controller."))
         }
     })()
     

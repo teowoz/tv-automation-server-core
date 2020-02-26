@@ -56,6 +56,58 @@ interface ITrackedProps {
 interface IState {
 	subsReady: boolean
 }
+
+class PrompterNotificationSingleton {
+	private _prevSeverity: string | null = null
+	private _hideTimeout: number | null = null
+	private _className = 'prompter-notification'
+	render() {
+		return (
+			<div className={this._className}>
+			</div>
+		)
+	}
+	get div(): HTMLDivElement | null {
+		return document.querySelector('.'+this._className)
+	}
+	show(severity: string, text: string): PrompterNotificationSingleton {
+		this._clearHideTimeout()
+		const div = this.div
+		if (div==null) {
+			console.warn("Couldn't show " + severity + " message: " + text)
+			return this
+		}
+		if (this._prevSeverity!=null) {
+			div.classList.remove(this._prevSeverity)
+		}
+		div.classList.add(severity)
+		div.classList.remove('hidden')
+		div.innerText = text
+		this._prevSeverity = severity
+		return this
+	}
+	hideAfter(ms: number): PrompterNotificationSingleton {
+		this._clearHideTimeout()
+		this._hideTimeout = window.setTimeout(this.hide.bind(this), ms)
+		return this
+	}
+	hide(): PrompterNotificationSingleton {
+		this._clearHideTimeout()
+		if (this.div!=null) {
+			this.div.classList.add('hidden')
+		}
+		return this
+	}
+	private _clearHideTimeout() {
+		if (this._hideTimeout!=null) {
+			window.clearTimeout(this._hideTimeout)
+			this._hideTimeout = null
+		}
+	}
+}
+
+export const PrompterNotification = new PrompterNotificationSingleton()
+
 export class PrompterViewInner extends MeteorReactComponent<Translated<IProps & ITrackedProps>, IState> {
 	usedHotkeys: Array<string> = []
 
@@ -580,6 +632,7 @@ export const Prompter = translateWithTracker<IPrompterProps, {}, IPrompterTracke
 
 						<div className='take-indicator hidden'></div>
 						<div className='next-indicator hidden'></div>
+						{ PrompterNotification.render() }
 					</div>
 
 					<div className='prompter-display'
